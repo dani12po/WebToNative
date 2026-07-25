@@ -1,0 +1,24 @@
+{
+  "name": "gas-webapp-generator",
+  "version": "1.0.0",
+  "description": "CLI generator untuk proyek Google Apps Script (GAS) Web App - Absensi & SPP SaaS style",
+  "type": "module",
+  "main": "index.js",
+  "bin": {
+    "gas-generate": "./index.js"
+  },
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "chalk": "^5.3.0",
+    "execa": "^8.0.1",
+    "fs-extra": "^11.2.0",
+    "inquirer": "^9.2.15",
+    "open": "^10.1.0",
+    "ora": "^8.0.1"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
