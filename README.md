@@ -1,23 +1,22 @@
 # GAS Web App Generator
 
-CLI Node.js untuk membuat, mengunggah, dan men-deploy Web App Google Apps Script (GAS) dengan dashboard SaaS modular. Setiap proyek memakai Google Sheets sebagai penyimpanan data dan dapat dikembangkan lebih lanjut dari Apps Script Editor.
+CLI Node.js untuk membuat dan deploy Google Apps Script (GAS) Web App modular, memigrasikan hasilnya ke Next.js, serta membuat wrapper mobile Android/iOS dengan Capacitor.
 
-## Yang dihasilkan
+## Kemampuan utama
 
-- 54+ preset aplikasi: kasir, toko fashion, laundry, bengkel, booking, sekolah, BIMBA, klinik, inventaris, keuangan, HR, restoran, dan lainnya.
-- Login, registrasi, logout, role Admin/User, serta menu **Akun Saya**.
-- Panel Admin untuk pengaturan harga, metode pembayaran, laporan, dan manajemen pengguna.
-- Database Google Sheets yang dibuat otomatis saat aplikasi pertama digunakan.
-- UI responsif untuk desktop, tablet, dan handphone.
-- Layout dashboard dan halaman login yang bervariasi: topbar, split, reversed, sidebar, glass workspace, spotlight, editorial, showcase, dan minimal.
-- Tema AI opsional untuk menghasilkan palet, font, komposisi login, serta gaya dashboard yang sesuai nama dan jenis aplikasi.
-- AI App Preflight opsional untuk menilai apakah preset modul sudah cocok; bila belum, blueprint modul bisnis tervalidasi dibuat dan disimpan agar dapat dipakai ulang.
-- Pembuatan proyek Apps Script, `clasp push`, dan deployment Web App dalam satu alur CLI.
+- 54+ preset aplikasi, termasuk kasir, toko fashion, laundry, bengkel, booking, sekolah, BIMBA, klinik, inventaris, keuangan, HR, dan restoran.
+- Login, registrasi, logout, role Admin/User, pengaturan akun, dan manajemen pengguna.
+- Dashboard responsif untuk desktop, tablet, dan ponsel dengan tema terang/gelap serta layout bervariasi.
+- Pengaturan harga, pembayaran, metode pembayaran, laporan, dan modul bisnis sesuai preset.
+- Database Google Sheets yang dibuat otomatis ketika GAS Web App pertama kali digunakan.
+- Tema AI opsional untuk memilih palet, font, landing page/login, dashboard, dan blueprint modul bisnis yang tervalidasi.
+- Migrasi GAS ke Next.js dengan landing page SaaS, SEO, API route, skema database, pemeriksaan build, dan QA AI.
+- Wrapper Capacitor untuk Android/iOS, debug APK, dan pengujian pada Android Emulator.
 
 ## Prasyarat
 
 1. Node.js 18 atau lebih baru.
-2. Akun Google yang memiliki akses Google Drive dan Apps Script.
+2. Akun Google dengan akses Google Drive dan Apps Script.
 3. Google Apps Script API aktif di [Apps Script settings](https://script.google.com/home/usersettings).
 4. `clasp` terpasang global:
 
@@ -25,33 +24,41 @@ CLI Node.js untuk membuat, mengunggah, dan men-deploy Web App Google Apps Script
    npm install -g @google/clasp
    ```
 
+Untuk fitur Android, install Android Studio, Android SDK Platform-Tools, dan Android Emulator.
+
 ## Instalasi
 
 ```bash
 git clone https://github.com/hydracore-digitech/web-app-generator-GAS.git
 cd web-app-generator-GAS
 npm install
-```
-
-## Membuat Web App
-
-```bash
 npm start
 ```
 
-Kemudian:
+## Mode tools
+
+Menu utama menyediakan empat alur:
+
+1. **WebApp New** — membuat dan deploy GAS Web App baru.
+2. **Migrasi Project** — mengubah proyek dari `project/` menjadi aplikasi Next.js di `webmigrasi/`.
+3. **Mobile App** — membuat wrapper Android/iOS dari web Next.js yang sudah dideploy HTTPS.
+4. **Cek Aplikasi** — menjalankan hasil wrapper di Android Emulator.
+
+Setelah satu proses selesai, tekan Enter untuk kembali ke menu utama. Sesi `clasp` dipakai ulang sehingga login Google tidak diminta berulang selama sesi masih valid.
+
+## Membuat Web App GAS
+
+Pilih **WebApp New**, kemudian:
 
 1. Masukkan nama proyek.
 2. Pilih preset aplikasi.
-3. Pilih apakah tema AI akan digunakan.
-4. Generator membuat folder `project/<nama-proyek>`, proyek Apps Script standalone, file sumber, push, dan deployment.
-5. Salin URL Web App yang tampil di terminal.
+3. Pilih penggunaan AI bila diperlukan.
+4. Generator membuat `project/<nama-proyek>`, proyek Apps Script standalone, file sumber, menjalankan `clasp push`, dan deployment Web App.
+5. Salin URL Web App yang ditampilkan di terminal.
 
-Setelah deployment, tekan Enter untuk kembali ke menu utama. Sesi `clasp` dipakai ulang sehingga tidak perlu login Google setiap membuat proyek baru.
+Generator menampilkan profil aplikasi sebelum proyek dibuat. Periksa profil ini untuk memastikan modul sesuai kebutuhan bisnis.
 
-> Generator menampilkan `Profil aplikasi terpilih` sebelum proses dibuat. Periksa baris ini untuk memastikan preset yang dipilih sudah benar.
-
-## Akun Admin awal
+### Akun Admin awal
 
 Pada penggunaan pertama, database dan akun awal dibuat otomatis:
 
@@ -61,17 +68,11 @@ Pada penggunaan pertama, database dan akun awal dibuat otomatis:
 | Password | `Admin123` |
 | Role | `admin` |
 
-Segera masuk lalu ubah password melalui menu **Akun Saya**. Jika sheet pengguna belum memiliki akun `Admin`, generator juga memastikan akun awal tersebut dibuat saat proses login.
+Segera ubah password melalui menu **Akun Saya**. Admin dapat mengelola pengguna dan peran melalui panel manajemen pengguna.
 
-## Fitur akun dan akses
+## Konfigurasi AI opsional
 
-Semua pengguna dapat membuka **Akun Saya** untuk memperbarui nama dan password sendiri. Perubahan password meminta password saat ini.
-
-Admin dapat membuka panel **Manajemen pengguna** dari halaman yang sama untuk melihat pengguna, memperbarui nama/role, dan mereset password. Aksi administratif meminta password Admin sebagai konfirmasi.
-
-## Tema AI opsional
-
-Buat file `api.txt` di root generator. File ini bersifat lokal dan sudah diabaikan Git.
+Buat file `api.txt` di root generator. File ini lokal dan diabaikan Git.
 
 ```text
 provider=nvidia
@@ -79,15 +80,9 @@ api_key=ISI_API_KEY_ANDA
 model=poolside/laguna-xs-2.1
 ```
 
-Provider yang didukung:
+Provider yang didukung: `openai`, `groq`, `nvidia`, `openrouter`, dan `custom` untuk endpoint HTTPS yang kompatibel dengan Chat Completions.
 
-- `openai`
-- `groq`
-- `nvidia`
-- `openrouter`
-- `custom` untuk endpoint HTTPS yang kompatibel dengan Chat Completions
-
-Konfigurasi `custom` memerlukan `endpoint` tambahan:
+Contoh provider custom:
 
 ```text
 provider=custom
@@ -96,33 +91,17 @@ api_key=ISI_API_KEY_ANDA
 model=nama-model
 ```
 
-Saat opsi AI dipilih, terminal mencatat provider, model, palet, font, layout, gaya dashboard, dan gaya login. Respons AI hanya boleh memilih komponen yang telah divalidasi generator; AI tidak pernah memasukkan HTML atau JavaScript bebas ke aplikasi hasil generate.
+AI hanya menghasilkan pilihan konfigurasi dan blueprint tervalidasi. AI tidak memasukkan HTML atau JavaScript bebas ke aplikasi GAS yang dihasilkan.
 
-Saat membuat GAS Web App, AI App Preflight juga dapat menganalisis kebutuhan modul sebelum proyek dibuat. Preset lokal selalu diperiksa lebih dahulu; jika sudah sesuai, misalnya preset Laundry yang telah memiliki order, harga per kg, pelanggan, pembayaran, dan laporan, preset digunakan kembali. Jika belum cocok, AI menghasilkan blueprint modul terstruktur yang tervalidasi dan menyimpannya pada `templates/gas-app-blueprints/` untuk dipakai lagi atau di-commit ke Git. Blueprint tidak berisi kode bebas dan tidak membuat klaim integrasi pembayaran yang tidak tersedia.
+## Pembayaran dan QRIS
 
-## Pembayaran, tarif, dan QRIS
+Preset dapat menyertakan Pengaturan Harga, Pembayaran, Metode Pembayaran, laporan, serta pencatatan rekening/e-wallet. Admin dapat memasang URL gambar QRIS merchant resmi.
 
-Preset memiliki modul **Pembayaran**, **Pengaturan Harga**, dan **Metode Pembayaran** sesuai kebutuhan. Admin dapat mencatat nominal, status pembayaran, rekening/e-wallet, instruksi transfer, dan URL gambar QRIS resmi merchant.
-
-Generator ini tidak membuat QRIS interoperable dari nomor rekening atau e-wallet dan tidak melakukan konfirmasi pembayaran otomatis. Untuk QRIS dinamis, verifikasi mutasi otomatis, atau pembayaran produksi, gunakan penyedia pembayaran resmi serta kredensial merchant yang sah.
-
-Contoh fitur khusus:
-
-- **Laundry**: order, layanan & harga, pelanggan, pembayaran, serta laporan. Total dihitung di server dengan rumus `(berat × harga per kg) − diskon`.
-- **Bengkel**: tiket servis, sparepart, teknisi, pelanggan, pembayaran, dan laporan bengkel.
-- **Kasir/Retail**: transaksi, produk, stok, pembayaran, dan laporan.
-
-## Sesi Google
-
-Status sesi lokal disimpan dalam `authsesion.json`. File ini hanya menyimpan status konfirmasi API dan metadata sesi; token OAuth tetap dikelola oleh `clasp` dan tidak disalin ke file tersebut.
-
-Selama `clasp` masih login, generator tidak akan meminta login OAuth atau aktivasi API berulang kali.
+Generator ini tidak mengubah nomor rekening/e-wallet menjadi QRIS interoperable dan tidak mengonfirmasi pembayaran otomatis. Untuk QRIS dinamis atau verifikasi mutasi produksi, gunakan penyedia pembayaran resmi dan kredensial merchant yang sah.
 
 ## Migrasi ke Next.js
 
-Pilih **Migrasikan proyek GAS ke Next.js** dari menu utama untuk membaca `Code.gs` sebuah proyek di `project/` dan membuat scaffold Next.js pada `webmigrasi/<nama-proyek>/`.
-
-Hasil migrasi memindahkan konfigurasi aplikasi, modul, formulir, dan dashboard ke React/Next.js serta siap dijalankan dengan:
+Pilih **Migrasi Project**, lalu pilih salah satu proyek dari `project/`. Hasilnya dibuat pada `webmigrasi/<nama-proyek>/`.
 
 ```bash
 cd webmigrasi/<nama-proyek>
@@ -130,42 +109,64 @@ npm install
 npm run dev
 ```
 
-Jika `api.txt` dikonfigurasi, **AI Migration Preflight** berjalan sebelum file dibuat untuk menganalisis modul, arah UI, risiko, rencana backend, checklist tes, serta metadata SEO. Ringkasannya tampil di terminal dan disimpan pada `MIGRATION_AUDIT.md` di output Next.js. Saat migrasi, tools menjalankan `npm install` dan `npm run build` otomatis terlebih dahulu agar error Next.js terlihat sebelum deployment; error yang dikenali dapat diperbaiki otomatis lalu dibangun ulang, sedangkan AI memberi analisis terminal untuk error lain. Mode tersebut juga menawarkan deploy otomatis melalui `npx vercel --prod`; pilih `No` untuk deploy manual di kemudian hari. Data Google Sheets dan akun GAS tidak disalin otomatis. Scaffold memakai penyimpanan browser sebagai baseline yang langsung dapat di-deploy, lalu perlu dihubungkan ke database dan autentikasi server-side untuk penggunaan multi-user/produksi.
+Jika `api.txt` tersedia, AI Migration Preflight menganalisis modul, UI, risiko, backend, SEO, dan checklist test. Ringkasannya disimpan sebagai `MIGRATION_AUDIT.md`. Tool menjalankan `npm install` dan `npm run build` otomatis. Jika build atau QA mendeteksi masalah yang dapat diperbaiki, AI membuat patch aman lalu build dijalankan ulang sebelum status selesai ditampilkan.
 
-Sebelum merakit UI, generator menilai template lokal dalam `templates/migration-designs/`. Jika ada kecocokan kuat, template itu digunakan ulang dan dipersonalisasi untuk copy landing, SEO, warna, serta layout. Jika belum ada template yang cocok, AI membuat **blueprint desain terstruktur** (bukan JavaScript/CSS bebas), generator memvalidasinya, lalu menyimpannya sebagai JSON di folder tersebut. Template yang tersimpan dapat direview dan di-commit ke Git untuk dipakai pada migrasi berikutnya.
+Output migrasi mencakup struktur API dan skema database. Untuk produksi multi-user, hubungkan database melalui `POSTGRES_URL` (misalnya Vercel Postgres) dan gunakan autentikasi server-side. Data Google Sheets dan akun GAS tidak dipindahkan otomatis.
+
+Tool juga memilih template lokal dari `templates/migration-designs/`. Jika tidak ada template yang sesuai, AI membuat blueprint desain tervalidasi yang dapat digunakan kembali pada migrasi berikutnya.
+
+## Mobile App: Android APK dan iOS wrapper
+
+Pilih **Mobile App**, lalu pilih hasil migrasi dari `webmigrasi/`. Masukkan URL HTTPS web yang sudah dideploy (contoh: URL Vercel), application ID seperti `com.webapp.kasir`, dan platform yang akan disiapkan.
+
+Untuk Android, tool membuat proyek Capacitor di `apkmigrasi/<nama-aplikasi>/`, memasang dependensi, menyinkronkan platform, lalu membuat debug APK tanpa keystore. APK yang siap dipasang berada di:
+
+```text
+apkmigrasi/<nama-aplikasi>/<nama-aplikasi>-debug.apk
+```
+
+Source native Android tersedia pada:
+
+```text
+apkmigrasi/<nama-aplikasi>/android/
+```
+
+Saat opsi testing emulator dipilih, proyek Android dibuka otomatis di Android Studio. Jika sudah ada Android Virtual Device (AVD), tool menjalankan dan memasang aplikasi ke emulator.
+
+### Setup Android Emulator satu kali
+
+1. Buka Android Studio.
+2. Pastikan **Android SDK Platform-Tools** dan **Android Emulator** terpasang melalui SDK Manager.
+3. Buka **Tools > Device Manager > Create Device**.
+4. Pilih perangkat, unduh/pilih System Image, kemudian selesaikan pembuatan AVD.
+
+Setelah AVD tersedia, gunakan menu **Cek Aplikasi** untuk menyalakan emulator dan menguji aplikasi. Jika SDK sudah mempunyai Command-line Tools dan System Image, tool menawarkan pembuatan AVD standar secara otomatis.
+
+Debug APK digunakan untuk testing internal. APK release, AAB Play Store, iOS archive, dan distribusi publik membutuhkan Android keystore atau Apple provisioning/signing milik pemilik aplikasi.
 
 ## Struktur proyek
 
 ```text
 web-app-generator-GAS/
-├── index.js
-├── package.json
-├── templates/
-│   ├── aiTheme.js
-│   ├── appHtmlV2.js
-│   ├── appHtmlV3.js
-│   ├── codeGs.js
-│   ├── databaseGs.js
-│   ├── projectProfiles.js
-│   └── visualThemes.js
-└── project/
-    └── <nama-proyek>/
-        ├── .clasp.json
-        ├── Code.gs
-        ├── Database.gs
-        ├── app.html
-        └── appsscript.json
+|-- index.js
+|-- templates/
+|   |-- aiTheme.js
+|   |-- mobileApp.js
+|   |-- nextJsMigration.js
+|   `-- ...
+|-- project/<nama-proyek>/       # output GAS
+|-- webmigrasi/<nama-proyek>/    # output Next.js
+`-- apkmigrasi/<nama-aplikasi>/  # output Capacitor Android/iOS
 ```
 
-Folder `project/` dan `webmigrasi/` adalah output generator dan tidak di-commit. Untuk mengubah aplikasi yang sudah dibuat, gunakan Apps Script Editor atau buat ulang proyek baru melalui generator.
+Folder `project/`, `webmigrasi/`, dan `apkmigrasi/` adalah output generator dan tidak di-commit.
 
 ## Keamanan dan penggunaan produksi
 
 - Jangan commit atau bagikan `api.txt`, `authsesion.json`, atau kredensial `clasp`.
 - Ganti password Admin awal sebelum aplikasi digunakan.
-- Uji dengan data non-produksi terlebih dahulu.
-- Buat backup Google Sheet secara berkala.
-- Untuk data sensitif, transaksi riil, atau kebutuhan kepatuhan khusus, lakukan audit keamanan dan pengembangan tambahan sebelum dipakai produksi.
+- Uji dengan data non-produksi terlebih dahulu dan cadangkan Google Sheet secara berkala.
+- Untuk data sensitif, transaksi nyata, atau kebutuhan kepatuhan khusus, lakukan audit keamanan dan pengembangan tambahan sebelum dipakai produksi.
 
 ## Lisensi
 
