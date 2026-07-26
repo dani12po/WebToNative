@@ -30,7 +30,7 @@ import { execa } from 'execa';
 
 import { getCodeGsTemplate } from './templates/codeGs.js';
 import { getDatabaseGsTemplate } from './templates/databaseGs.js';
-import { getAppHtmlTemplate } from './templates/appHtmlV2.js';
+import { getAppHtmlTemplate } from './templates/appHtmlV3.js';
 import { getAppsscriptJsonTemplate } from './templates/appsscriptJson.js';
 import { PROJECT_TYPE_CHOICES, getProjectProfile } from './templates/projectProfiles.js';
 import { getRandomVisualTheme } from './templates/visualThemes.js';
