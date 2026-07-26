@@ -20,6 +20,14 @@ const date = (key, label) => ({ key, label, type: 'date' });
 const select = (key, label, options) => ({ key, label, type: 'select', options });
 
 const MODULES_BY_TYPE = {
+  workshop: [
+    { id: 'tiket', name: 'Tiket Servis', icon: 'T', fields: [text('pelanggan', 'Nama pelanggan'), text('kendaraan', 'Kendaraan / nomor plat'), text('keluhan', 'Keluhan'), text('teknisi', 'Teknisi'), number('estimasi', 'Estimasi biaya (Rp)'), select('status', 'Status', ['Masuk', 'Diagnosa', 'Dikerjakan', 'Siap diambil', 'Selesai'])] },
+    { id: 'sparepart', name: 'Sparepart', icon: 'S', adminOnly: true, fields: [text('nama', 'Nama sparepart'), text('kode', 'Kode barang'), number('stok', 'Stok'), number('harga', 'Harga jual (Rp)')] },
+    { id: 'teknisi', name: 'Teknisi', icon: 'K', adminOnly: true, fields: [text('nama', 'Nama teknisi'), text('keahlian', 'Keahlian'), text('telepon', 'Nomor telepon'), select('status', 'Status', ['Aktif', 'Libur', 'Nonaktif'])] },
+    { id: 'pelanggan', name: 'Pelanggan', icon: 'P', adminOnly: true, fields: [text('nama', 'Nama pelanggan'), text('telepon', 'Nomor telepon'), text('kendaraan', 'Kendaraan'), text('alamat', 'Alamat')] },
+    { id: 'pembayaran', name: 'Pembayaran', icon: 'Rp', adminOnly: true, fields: [text('tiket', 'ID tiket servis'), number('nominal', 'Nominal (Rp)'), select('metode', 'Metode bayar', ['Tunai', 'QRIS', 'Transfer']), select('status', 'Status', ['Belum dibayar', 'DP', 'Lunas'])] },
+    { id: 'laporan', name: 'Laporan Bengkel', icon: '#', adminOnly: true, fields: [text('periode', 'Periode'), number('pendapatan', 'Pendapatan (Rp)'), number('biaya', 'Biaya (Rp)'), text('catatan', 'Catatan')] }
+  ],
   laundry: [
     { id: 'order', name: 'Order Laundry', icon: 'O', fields: [text('pelanggan', 'Nama pelanggan'), text('layanan', 'Layanan'), number('berat', 'Berat (kg)'), number('harga', 'Harga per kg (Rp)'), number('diskon', 'Diskon (Rp)'), number('total', 'Total tagihan (Rp)'), select('metodeBayar', 'Metode pembayaran', ['Tunai', 'QRIS', 'Transfer']), select('statusBayar', 'Status pembayaran', ['Belum dibayar', 'DP', 'Lunas']), select('statusOrder', 'Status order', ['Diterima', 'Dicuci', 'Dikeringkan', 'Disetrika', 'Siap diambil', 'Selesai'])] },
     { id: 'layanan', name: 'Layanan & Harga', icon: '$', adminOnly: true, fields: [text('layanan', 'Nama layanan'), number('harga', 'Harga dasar / kg (Rp)'), text('satuan', 'Satuan'), select('status', 'Status layanan', ['Aktif', 'Nonaktif'])] },
@@ -106,6 +114,17 @@ function defaultModules(profile) {
   ];
 }
 
+function withSaasModules(modules) {
+  const result = modules.slice();
+  if (!result.some(module => module.id === 'pembayaran')) {
+    result.push({ id: 'pembayaran', name: 'Pembayaran', icon: 'Rp', adminOnly: true, fields: [text('referensi', 'Referensi transaksi'), number('nominal', 'Nominal (Rp)'), select('metode', 'Metode pembayaran', ['Tunai', 'QRIS', 'Transfer', 'Kartu']), select('status', 'Status pembayaran', ['Menunggu', 'DP', 'Lunas', 'Dibatalkan'])] });
+  }
+  if (!result.some(module => module.id === 'pengaturan')) {
+    result.push({ id: 'pengaturan', name: 'Pengaturan Harga', icon: '$', adminOnly: true, fields: [text('nama', 'Nama layanan / produk'), number('harga', 'Harga (Rp)'), text('satuan', 'Satuan'), select('status', 'Status', ['Aktif', 'Nonaktif'])] });
+  }
+  return result;
+}
+
 export const PROJECT_TYPE_CHOICES = Object.entries(PROFILES).map(([value, profile]) => ({ name: profile.name, value }));
 
 export function getProjectProfile(type) {
@@ -113,6 +132,6 @@ export function getProjectProfile(type) {
   return {
     id: type,
     ...profile,
-    modules: MODULES_BY_TYPE[type] || defaultModules(profile)
+    modules: withSaasModules(MODULES_BY_TYPE[type] || defaultModules(profile))
   };
 }

@@ -1,4 +1,5 @@
 node_modules/
 project/
 .clasprc.json
+authsesion.json
 *.log

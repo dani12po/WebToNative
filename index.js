@@ -45,6 +45,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const ROOT_DIR = __dirname;
 const PROJECT_CONTAINER_DIR = path.join(ROOT_DIR, 'project');
+const GENERATOR_STATE_PATH = path.join(ROOT_DIR, 'authsesion.json');
 
 // ------------------------------------------------------------------
 // UTIL: banner & logging
@@ -98,6 +99,31 @@ async function ensureClaspAvailable() {
     logInfo('Install terlebih dahulu dengan perintah:');
     logInfo(chalk.yellow('  npm install -g @google/clasp'));
     return false;
+  }
+}
+
+async function loadGeneratorState() {
+  try {
+    if (await fs.pathExists(GENERATOR_STATE_PATH)) {
+      return await fs.readJson(GENERATOR_STATE_PATH);
+    }
+  } catch (err) {
+    logInfo('Status sesi lokal tidak dapat dibaca; akan diperiksa ulang.');
+  }
+  return { appsScriptApiConfirmed: false, claspSession: null };
+}
+
+async function saveGeneratorState(state) {
+  await fs.writeJson(GENERATOR_STATE_PATH, state, { spaces: 2 });
+}
+
+async function getClaspSession() {
+  try {
+    const result = await execa('clasp', ['show-authorized-user', '--json']);
+    const session = JSON.parse(result.stdout);
+    return session.loggedIn ? session : null;
+  } catch (err) {
+    return null;
   }
 }
 
@@ -165,7 +191,12 @@ async function prepareProjectDirectory(folderName) {
 // ------------------------------------------------------------------
 // LANGKAH 2: Gerbang otomasi akses (buka browser + konfirmasi)
 // ------------------------------------------------------------------
-async function gateGoogleApiActivation() {
+async function gateGoogleApiActivation(state) {
+  if (state.appsScriptApiConfirmed) {
+    logInfo('Google Apps Script API sudah dikonfirmasi pada sesi sebelumnya.');
+    return;
+  }
+
   logStep('Membuka browser untuk mengaktifkan Google Apps Script API...');
   try {
     await open('https://script.google.com/home/usersettings');
@@ -188,6 +219,9 @@ async function gateGoogleApiActivation() {
   if (!apiEnabled) {
     throw new Error('Proses dihentikan karena Google Apps Script API belum diaktifkan.');
   }
+
+  state.appsScriptApiConfirmed = true;
+  await saveGeneratorState(state);
 }
 
 // ------------------------------------------------------------------
@@ -374,7 +408,14 @@ async function main() {
     return;
   }
 
-  let isAuthenticated = false;
+  const state = await loadGeneratorState();
+  const currentSession = await getClaspSession();
+  let isAuthenticated = Boolean(currentSession);
+  if (currentSession) {
+    state.claspSession = { email: currentSession.email, checkedAt: new Date().toISOString() };
+    await saveGeneratorState(state);
+    logInfo(`Menggunakan sesi clasp tersimpan: ${currentSession.email}.`);
+  }
 
   while (true) {
     try {
@@ -386,10 +427,16 @@ async function main() {
       const projectDir = await prepareProjectDirectory(folderName);
       logSuccess(`Folder proyek siap: ${projectDir}`);
 
+      await gateGoogleApiActivation(state);
       if (!isAuthenticated) {
-        await gateGoogleApiActivation();
         await runClaspLogin(projectDir);
         isAuthenticated = true;
+        const refreshedSession = await getClaspSession();
+        state.claspSession = {
+          email: refreshedSession?.email || null,
+          checkedAt: new Date().toISOString()
+        };
+        await saveGeneratorState(state);
       } else {
         logInfo('Menggunakan sesi clasp yang sudah login.');
       }

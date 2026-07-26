@@ -1,39 +1,28 @@
-# GAS Web App Generator (Node.js CLI)
+# GAS Web App Generator
 
-Generator otomatis untuk proyek **Google Apps Script (GAS) Web App** bertema
-Absensi + SPP dengan tampilan SaaS modern (dark/light split-screen).
+CLI Node.js untuk membuat dan deploy Google Apps Script Web App dengan dashboard SaaS modular, Google Sheets sebagai database, serta tema visual responsif.
 
-## Struktur Direktori
+## Fitur utama
 
-```
-gas-webapp-generator/
-├── index.js                  # Skrip utama bot (root, jangan dipindah)
-├── package.json
-├── templates/
-│   ├── codeGs.js              # Generator konten Code.gs
-│   ├── databaseGs.js          # Generator konten Database.gs
-│   ├── appHtml.js             # Generator konten app.html
-│   └── appsscriptJson.js      # Generator konten appsscript.json
-└── project/                   # Dibuat otomatis saat CLI dijalankan
-    └── <nama-proyek-anda>/    # Sub-folder per proyek yang di-generate
-        ├── Code.gs
-        ├── Database.gs
-        ├── app.html
-        ├── appsscript.json
-        └── .clasp.json         # Dibuat oleh `clasp create`
-```
-
-Semua proses (generate file, `clasp create`, `clasp push`) hanya menyentuh
-`project/<nama-proyek-anda>/` — root directory bot tidak pernah kotor.
+- 54 preset aplikasi, termasuk Kasir, Laundry, Bengkel, Booking, BIMBA, Analisis Keuangan, Inventaris, Sekolah, Klinik, Restoran, E-Commerce, HR, dan lainnya.
+- Dashboard modular: data utama, aktivitas, laporan, pembayaran, dan pengaturan harga.
+- Role awal Admin dan User; menu Admin hanya ditampilkan untuk Admin.
+- 12 tema visual dengan kombinasi warna, font, serta lima variasi layout dashboard.
+- Responsif untuk desktop, tablet, dan handphone.
+- Login, registrasi, logout, tabel data, dan notifikasi aplikasi.
+- Database Google Sheets dibuat otomatis saat aplikasi pertama digunakan.
+- Pembuatan Apps Script, push source, dan deployment dilakukan dari CLI.
 
 ## Prasyarat
 
-1. **Node.js** >= 18
-2. **clasp** CLI Google terpasang global:
+1. Node.js 18 atau lebih baru.
+2. `clasp` terpasang secara global:
+
    ```bash
    npm install -g @google/clasp
    ```
-3. Akun Google dengan akses ke Google Drive & Apps Script.
+
+3. Akun Google dengan akses Google Drive dan Apps Script.
 
 ## Instalasi
 
@@ -42,66 +31,87 @@ cd gas-webapp-generator
 npm install
 ```
 
-## Menjalankan
-
-Buka terminal VS Code di folder `gas-webapp-generator`, lalu:
+## Menjalankan generator
 
 ```bash
-node index.js
+npm start
 ```
 
-Alur interaktif yang akan terjadi:
+Pilih nama proyek dan template aplikasi. Generator akan membuat folder pada `project/<nama-proyek>`, membuat Apps Script standalone, mengirim source, lalu membuat deployment Web App.
 
-1. **Nama proyek** — Anda diminta memasukkan nama proyek (mis. `absensi-spp-app`).
-   Folder `project/<nama>` otomatis dibuat.
-2. **Aktivasi API** — Browser terbuka otomatis untuk memandu Anda mengaktifkan
-   *Google Apps Script API* pada akun Google Anda. Konfirmasi lewat prompt
-   ketika sudah selesai.
-3. **Login Google** — `clasp login` dijalankan otomatis; sebuah tab OAuth akan
-   terbuka untuk menyambungkan akun Anda ke clasp.
-4. **Pembuatan proyek cloud** — `clasp create --type standalone` dijalankan di
-   dalam `project/<nama>/`, membuat proyek Apps Script baru di Google Drive.
-   Proyek standalone tersebut kemudian di-deploy sebagai Web App.
-5. **Perakitan kode** — Bot menulis `Code.gs`, `Database.gs`, `app.html`, dan
-   `appsscript.json` ke dalam folder proyek (menimpa file stub bawaan clasp).
-6. **Push** — `clasp push --force` mengunggah semua kode ke server GAS.
-7. **Deploy** — `clasp deploy` dijalankan otomatis untuk membuat deployment
-   Web App. Bot membaca Deployment ID dari output terminal clasp lalu
-   menyusun link akses publiknya.
-8. **Selesai** — Pesan sukses berwarna hijau ditampilkan beserta:
-   - Link Web App siap-pakai: `https://script.google.com/macros/s/<deploymentId>/exec`
-   - Link editor Apps Script: `https://script.google.com/d/<scriptId>/edit`
+Setelah proyek selesai, tekan Enter untuk kembali ke menu utama dan membuat proyek lain dalam sesi yang sama.
 
-## Setelah Generate
+## Sesi Google dan API
 
-Gunakan akun awal berikut saat pertama membuka aplikasi:
+Pada run pertama, generator akan memandu aktivasi Apps Script API dan login `clasp`.
+
+Status lokal disimpan sebagai `authsesion.json` di direktori generator. File tersebut menyimpan konfirmasi API, email sesi, dan waktu pemeriksaan. Token OAuth tidak disalin ke file ini; token tetap dikelola `clasp`.
+
+Selama sesi `clasp` masih aktif, run berikutnya tidak membuka OAuth atau meminta konfirmasi API lagi. File `authsesion.json` diabaikan Git agar tidak ikut dipublikasikan.
+
+## Akun awal aplikasi
+
+Saat database proyek baru pertama dibuat, akun berikut tersedia:
 
 - Username: `Admin`
 - Password: `Admin123`
+- Role: `admin`
 
-Akun ini dibuat otomatis hanya ketika database proyek pertama kali diinisialisasi.
+Segera ubah password awal sebelum aplikasi digunakan secara nyata.
 
-1. Buka link **Web App (/exec)** yang ditampilkan untuk mengakses aplikasi.
-   Spreadsheet dan sheet untuk tema yang dipilih dibuat otomatis saat akses pertama.
-2. Kunjungan pertama biasanya memunculkan layar izin/otorisasi Google — ini
-   normal untuk deployment baru, cukup setujui sekali.
-3. Setiap kali Anda mengubah kode dan ingin mem-publish ulang, jalankan
-   dari dalam folder proyek:
-   ```bash
-   clasp push --force
-   clasp deploy --description "update"
-   ```
-   Link `/exec` versi lama tetap berlaku (deployment "terkelola"); jika
-   ingin versi baru menimpa link yang sama, gunakan
-   `clasp deployments` untuk melihat ID, lalu `clasp deploy -i <deploymentId>`.
+## Pembayaran dan harga
 
-## Arsitektur Kode yang Digenerate
+Setiap preset mendapatkan modul Pembayaran dan Pengaturan Harga untuk Admin, kecuali bila preset sudah memiliki modul versi khusus.
 
-Hanya **3 file inti** (sesuai desain, tidak dipecah-pecah):
+Metode pembayaran yang dapat dicatat: Tunai, QRIS, Transfer, dan Kartu. QRIS pada generator adalah pencatatan metode dan status pembayaran. QR dinamis atau konfirmasi pembayaran otomatis memerlukan integrasi payment gateway resmi beserta kredensial pengguna, misalnya Midtrans atau Xendit.
 
-- `Code.gs` — routing (`doGet`), seluruh callback `apiXxx()` untuk frontend,
-  dan `setupDatabase()`.
-- `Database.gs` — schema (pembuatan sheet), Auth (hash SHA-256, login,
-  register), Attendance, dan modul SPP.
-- `app.html` — UI login + dashboard SaaS (Tailwind CDN), SPA berbasis
-  vanilla JS (toggle class, tanpa reload), memanggil `google.script.run`.
+Preset Laundry memiliki modul tambahan untuk Order, Layanan & Harga, Pelanggan, Pembayaran, dan Laporan. Total tagihan disimpan dengan perhitungan server:
+
+```text
+(berat × harga per kg) − diskon
+```
+
+Preset Bengkel memiliki Tiket Servis, Sparepart, Teknisi, Pelanggan, Pembayaran, dan Laporan Bengkel.
+
+## Preset dan tampilan
+
+Setiap proyek memilih tema visual secara otomatis. Tema dapat mengubah palet warna, font, halaman login, dan struktur dashboard seperti sidebar kiri, navigasi atas, sidebar kanan, glass workspace, atau layout compact.
+
+Semua dashboard tetap mempertahankan form yang bisa digunakan, penyimpanan data Google Sheets, serta tabel responsif. Pada layar kecil, menu berubah menjadi navigasi horizontal dan tabel bisa digeser tanpa memecahkan layout.
+
+## Struktur proyek
+
+```text
+gas-webapp-generator/
+├── index.js
+├── package.json
+├── templates/
+│   ├── appHtmlV2.js
+│   ├── appHtmlV3.js
+│   ├── codeGs.js
+│   ├── databaseGs.js
+│   ├── projectProfiles.js
+│   ├── visualThemes.js
+│   └── appsscriptJson.js
+└── project/
+    └── <nama-proyek>/
+        ├── Code.gs
+        ├── Database.gs
+        ├── app.html
+        ├── appsscript.json
+        └── .clasp.json
+```
+
+## File yang dihasilkan
+
+- `Code.gs`: entry point Web App dan API untuk frontend.
+- `Database.gs`: schema Google Sheets, autentikasi, modul data, pembayaran, dan perhitungan khusus.
+- `app.html`: halaman login dan dashboard SPA responsif.
+- `appsscript.json`: manifest Apps Script.
+
+## Catatan keamanan dan operasional
+
+- Jangan membagikan file kredensial `clasp` atau file sesi lokal.
+- Gunakan password Admin yang baru sebelum aplikasi dipakai pelanggan.
+- Validasi dan pembatasan akses perlu disesuaikan lagi jika aplikasi menangani data sensitif atau transaksi nyata.
+- Uji deployment dengan akun dan data non-produksi sebelum digunakan pelanggan.
