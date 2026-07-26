@@ -35,7 +35,7 @@ function validateTheme(raw, fallback) {
 
 export async function promptAndGenerateAiTheme(projectName, profile, fallbackTheme) {
   const { enabled } = await inquirer.prompt([{ type: 'confirm', name: 'enabled', message: 'Gunakan AI untuk membuat tema visual proyek ini?', default: false }]);
-  if (!enabled) return fallbackTheme;
+  if (!enabled) return { theme: fallbackTheme, used: false };
   const configPath = new URL('../api.txt', import.meta.url);
   let text;
   try { text = await fs.readFile(configPath, 'utf8'); } catch (err) { throw new Error('File api.txt tidak ditemukan. Salin api.txt.example lalu isi provider, api_key, dan model.'); }
@@ -44,14 +44,16 @@ export async function promptAndGenerateAiTheme(projectName, profile, fallbackThe
   if (!config.api_key || !config.model) throw new Error('api.txt wajib memuat api_key dan model.');
   const endpoint = provider === 'custom' ? config.endpoint : PROVIDERS[provider]?.endpoint;
   if (!endpoint || !/^https:\/\//.test(endpoint)) throw new Error('Provider atau endpoint di api.txt tidak valid.');
+  console.log(`  Konfigurasi AI ditemukan: ${provider === 'custom' ? 'endpoint custom' : PROVIDERS[provider].name}, model ${config.model}.`);
+  console.log('  Menghubungi AI untuk membuat warna, font, dan layout...');
   const prompt = `Buat tema UI profesional untuk aplikasi web Indonesia.\nJudul proyek: ${projectName}\nJenis aplikasi: ${profile.name}\nKegunaan: ${profile.tagline}\nKembalikan JSON saja, tanpa markdown, dengan schema: {"name":"...","primary":"#RRGGBB","secondary":"#RRGGBB","dark":"#RRGGBB","soft":"#RRGGBB","background":"#RRGGBB","layout":"split|centered|split-reverse|sidebar|glass","fontFamily":"Inter|Manrope|DM Sans|Nunito Sans|Plus Jakarta Sans"}. Pilih desain kontras, aksesibel, dan sesuai bisnis; jangan gunakan warna acak.`;
   const response = await fetch(endpoint, {
     method: 'POST',
     headers: { Authorization: `Bearer ${config.api_key}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({ model: config.model, messages: [{ role: 'user', content: prompt }], temperature: 0.8 })
   });
-  if (!response.ok) throw new Error(`Provider AI gagal: HTTP ${response.status}.`);
+  if (!response.ok) throw new Error(`Provider AI gagal merespons (HTTP ${response.status}). Periksa api_key, model, dan provider di api.txt.`);
   const payload = await response.json();
   const content = payload.choices?.[0]?.message?.content;
-  return validateTheme(extractJson(content || ''), fallbackTheme);
+  return { theme: validateTheme(extractJson(content || ''), fallbackTheme), used: true, provider, model: config.model };
 }

@@ -424,12 +424,18 @@ async function main() {
       const defaultTheme = getRandomVisualTheme(profile.id);
       let visualTheme = defaultTheme;
       try {
-        visualTheme = await promptAndGenerateAiTheme(displayName, profile, defaultTheme);
+        const aiResult = await promptAndGenerateAiTheme(displayName, profile, defaultTheme);
+        visualTheme = aiResult.theme;
+        if (aiResult.used) {
+          logSuccess(`Tema AI berhasil dibuat: ${visualTheme.name} (${visualTheme.layout}), provider ${aiResult.provider}, model ${aiResult.model}.`);
+        } else {
+          logInfo(`Tema bawaan dipakai: ${visualTheme.name} (${visualTheme.layout}).`);
+        }
       } catch (err) {
         logError(`Tema AI tidak dapat dibuat: ${err.message}`);
         logInfo('Generator menggunakan tema bawaan yang aman.');
+        logInfo(`Tema fallback: ${visualTheme.name} (${visualTheme.layout}).`);
       }
-      logInfo(`Tema visual otomatis: ${visualTheme.name} (${visualTheme.layout}).`);
 
       logStep(`Menyiapkan folder proyek di: project/${folderName}`);
       const projectDir = await prepareProjectDirectory(folderName);
