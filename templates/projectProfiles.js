@@ -122,6 +122,9 @@ function withSaasModules(modules) {
   if (!result.some(module => module.id === 'pengaturan')) {
     result.push({ id: 'pengaturan', name: 'Pengaturan Harga', icon: '$', adminOnly: true, fields: [text('nama', 'Nama layanan / produk'), number('harga', 'Harga (Rp)'), text('satuan', 'Satuan'), select('status', 'Status', ['Aktif', 'Nonaktif'])] });
   }
+  if (!result.some(module => module.id === 'metodePembayaran')) {
+    result.push({ id: 'metodePembayaran', name: 'Metode Pembayaran', icon: 'QR', adminOnly: true, fields: [select('jenis', 'Jenis pembayaran', ['QRIS', 'Transfer Bank', 'E-Wallet', 'Tunai']), text('nama', 'Nama bank / e-wallet'), text('penerima', 'Nama penerima'), text('nomor', 'Nomor rekening / e-wallet'), text('qrisUrl', 'URL gambar QRIS resmi (opsional)'), text('instruksi', 'Instruksi pembayaran')] });
+  }
   return result;
 }
 

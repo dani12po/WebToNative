@@ -14,11 +14,19 @@ const LAYOUT_CSS = `
 @media(min-width:768px) and (max-width:1023px){#sidebar{width:13.5rem!important}#dashboard>section{padding:1.5rem!important}#dashboard .grid{grid-template-columns:1fr 1.5fr!important}#dashboard table{min-width:38rem}}
 `;
 
+const PAYMENT_PANEL = `
+<button id="paymentHelpBtn" class="fixed bottom-5 left-5 z-20 rounded-full px-5 py-3 text-sm font-bold text-white shadow-lg" style="background:var(--primary)">Pembayaran</button>
+<div id="paymentModal" class="is-hidden fixed inset-0 z-30 grid place-items-center bg-slate-950/60 p-4"><div class="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-3xl bg-white p-6 shadow-2xl"><div class="flex items-start justify-between gap-3"><div><p class="text-sm font-bold" style="color:var(--primary)">INSTRUKSI PEMBAYARAN</p><h2 class="mt-1 text-2xl font-black">Pilih metode pembayaran</h2></div><button id="paymentCloseBtn" class="rounded-xl bg-slate-100 px-3 py-2 font-bold">Tutup</button></div><div id="paymentMethods" class="mt-5 space-y-3"><p class="text-sm text-slate-500">Memuat metode pembayaran…</p></div><div class="mt-6 flex gap-3"><button id="paymentShareBtn" class="flex-1 rounded-xl bg-slate-900 px-4 py-3 font-bold text-white">Bagikan</button><button id="paymentPrintBtn" class="flex-1 rounded-xl border px-4 py-3 font-bold">Cetak</button></div></div></div>
+<script>(function(){const $=id=>document.getElementById(id);let methods=[];const esc=v=>String(v||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));function render(){const host=$('paymentMethods');if(!methods.length){host.innerHTML='<p class="rounded-xl bg-amber-50 p-4 text-sm text-amber-800">Admin belum mengatur metode pembayaran.</p>';return}host.innerHTML=methods.map(m=>{const q=/^https:\/\//i.test(m.qrisUrl||'')?'<img class="mt-3 max-h-56 rounded-xl border" src="'+esc(m.qrisUrl)+'" alt="QRIS resmi '+esc(m.nama)+'">':'';return'<article class="rounded-2xl border p-4"><b>'+esc(m.jenis)+' • '+esc(m.nama)+'</b><p class="mt-1 text-sm">'+esc(m.penerima)+'</p><p class="font-mono text-sm font-bold">'+esc(m.nomor)+'</p>'+q+'<p class="mt-3 text-sm text-slate-600">'+esc(m.instruksi)+'</p></article>'}).join('')}function open(){ $('paymentModal').classList.remove('is-hidden');google.script.run.withSuccessHandler(r=>{methods=r.success?r.data:[];render()}).apiGetPaymentMethods()}function close(){$('paymentModal').classList.add('is-hidden')}function text(){return methods.map(m=>m.jenis+' - '+m.nama+'\\nPenerima: '+m.penerima+'\\nNomor: '+m.nomor+'\\n'+m.instruksi).join('\\n\\n')}$('paymentHelpBtn').onclick=open;$('paymentCloseBtn').onclick=close;$('paymentModal').onclick=e=>{if(e.target===$('paymentModal'))close()};$('paymentShareBtn').onclick=()=>{const t=text();if(navigator.share)navigator.share({title:'Instruksi Pembayaran',text:t});else navigator.clipboard.writeText(t).then(()=>alert('Instruksi pembayaran disalin.'))};$('paymentPrintBtn').onclick=()=>{const w=open('','_blank');w.document.write('<pre style="font:14px system-ui;white-space:pre-wrap">'+esc(text())+'</pre>');w.print()}})();</script>`;
+
+const PAYMENT_PRINT_FIX = `<script>document.getElementById('paymentPrintBtn').onclick=function(){window.print()};</script>`;
+
 export function getAppHtmlTemplate(projectName, profile, theme) {
   const specializedLayouts = { workshop: 'workshop' };
   const layout = specializedLayouts[profile.id] || theme.layout;
   const html = getBaseAppHtmlTemplate(projectName, profile, theme);
   return html
     .replace('</head>', `<style>${LAYOUT_CSS}</style></head>`)
-    .replace('<body>', `<body class="dash-${layout}">`);
+    .replace('<body>', `<body class="dash-${layout}">`)
+    .replace('</body>', `${PAYMENT_PANEL}${PAYMENT_PRINT_FIX}</body>`);
 }
