@@ -49,6 +49,18 @@ Status lokal disimpan sebagai `authsesion.json` di direktori generator. File ter
 
 Selama sesi `clasp` masih aktif, run berikutnya tidak membuka OAuth atau meminta konfirmasi API lagi. File `authsesion.json` diabaikan Git agar tidak ikut dipublikasikan.
 
+## Tema visual dengan AI (opsional)
+
+Untuk meminta AI membuat warna, font, dan layout berdasarkan judul serta jenis aplikasi, salin `api.txt.example` menjadi `api.txt`, lalu isi konfigurasi berikut:
+
+```text
+provider=openai
+api_key=ISI_API_KEY_ANDA
+model=ISI_MODEL_ANDA
+```
+
+Provider yang didukung: `openai`, `groq`, `nvidia`, `openrouter`, atau `custom` dengan `endpoint` HTTPS kompatibel Chat Completions. File `api.txt` tidak pernah di-commit dan tidak disalin ke proyek hasil generate. Saat generator bertanya apakah tema AI akan digunakan, pilih `Yes` untuk memakai konfigurasi tersebut.
+
 ## Akun awal aplikasi
 
 Saat database proyek baru pertama dibuat, akun berikut tersedia:

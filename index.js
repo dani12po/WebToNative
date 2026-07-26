@@ -34,6 +34,7 @@ import { getAppHtmlTemplate } from './templates/appHtmlV3.js';
 import { getAppsscriptJsonTemplate } from './templates/appsscriptJson.js';
 import { PROJECT_TYPE_CHOICES, getProjectProfile } from './templates/projectProfiles.js';
 import { getRandomVisualTheme } from './templates/visualThemes.js';
+import { promptAndGenerateAiTheme } from './templates/aiTheme.js';
 
 // ------------------------------------------------------------------
 // PATH DASAR
@@ -420,7 +421,14 @@ async function main() {
   while (true) {
     try {
       const { displayName, folderName, profile } = await promptProjectName();
-      const visualTheme = getRandomVisualTheme(profile.id);
+      const defaultTheme = getRandomVisualTheme(profile.id);
+      let visualTheme = defaultTheme;
+      try {
+        visualTheme = await promptAndGenerateAiTheme(displayName, profile, defaultTheme);
+      } catch (err) {
+        logError(`Tema AI tidak dapat dibuat: ${err.message}`);
+        logInfo('Generator menggunakan tema bawaan yang aman.');
+      }
       logInfo(`Tema visual otomatis: ${visualTheme.name} (${visualTheme.layout}).`);
 
       logStep(`Menyiapkan folder proyek di: project/${folderName}`);
