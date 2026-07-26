@@ -20,6 +20,8 @@ function validHex(value, fallback) {
 
 function validateTheme(raw, fallback) {
   const layouts = new Set(['split', 'centered', 'split-reverse', 'sidebar', 'glass']);
+  const dashboardStyles = new Set(['commerce', 'operations', 'studio', 'executive', 'schedule']);
+  const loginStyles = new Set(['split', 'spotlight', 'editorial', 'showcase', 'minimal']);
   return {
     id: 'ai-custom',
     name: String(raw.name || 'AI Custom Theme').slice(0, 40),
@@ -29,7 +31,9 @@ function validateTheme(raw, fallback) {
     soft: validHex(raw.soft, fallback.soft),
     background: validHex(raw.background, fallback.background),
     layout: layouts.has(raw.layout) ? raw.layout : fallback.layout,
-    fontFamily: ['Inter', 'Manrope', 'DM Sans', 'Nunito Sans', 'Plus Jakarta Sans'].includes(raw.fontFamily) ? raw.fontFamily : null
+    fontFamily: ['Inter', 'Manrope', 'DM Sans', 'Nunito Sans', 'Plus Jakarta Sans'].includes(raw.fontFamily) ? raw.fontFamily : null,
+    dashboardStyle: dashboardStyles.has(raw.dashboardStyle) ? raw.dashboardStyle : 'operations',
+    loginStyle: loginStyles.has(raw.loginStyle) ? raw.loginStyle : 'split'
   };
 }
 
@@ -45,8 +49,8 @@ export async function promptAndGenerateAiTheme(projectName, profile, fallbackThe
   const endpoint = provider === 'custom' ? config.endpoint : PROVIDERS[provider]?.endpoint;
   if (!endpoint || !/^https:\/\//.test(endpoint)) throw new Error('Provider atau endpoint di api.txt tidak valid.');
   console.log(`  Konfigurasi AI ditemukan: ${provider === 'custom' ? 'endpoint custom' : PROVIDERS[provider].name}, model ${config.model}.`);
-  console.log('  Menghubungi AI untuk membuat warna, font, dan layout...');
-  const prompt = `Buat tema UI profesional untuk aplikasi web Indonesia.\nJudul proyek: ${projectName}\nJenis aplikasi: ${profile.name}\nKegunaan: ${profile.tagline}\nKembalikan JSON saja, tanpa markdown, dengan schema: {"name":"...","primary":"#RRGGBB","secondary":"#RRGGBB","dark":"#RRGGBB","soft":"#RRGGBB","background":"#RRGGBB","layout":"split|centered|split-reverse|sidebar|glass","fontFamily":"Inter|Manrope|DM Sans|Nunito Sans|Plus Jakarta Sans"}. Pilih desain kontras, aksesibel, dan sesuai bisnis; jangan gunakan warna acak.`;
+  console.log('  Menghubungi AI untuk membuat palet, font, komposisi, dan layout dashboard...');
+  const prompt = `Anda adalah art director SaaS Indonesia. Rancang sistem visual yang benar-benar sesuai dengan bisnis berikut, bukan tema generik.\nJudul proyek: ${projectName}\nJenis aplikasi: ${profile.name}\nKegunaan: ${profile.tagline}\n\nKembalikan JSON SAJA tanpa markdown dengan schema: {"name":"nama gaya singkat","primary":"#RRGGBB","secondary":"#RRGGBB","dark":"#RRGGBB","soft":"#RRGGBB","background":"#RRGGBB","layout":"split|centered|split-reverse|sidebar|glass","dashboardStyle":"commerce|operations|studio|executive|schedule","loginStyle":"split|spotlight|editorial|showcase|minimal","fontFamily":"Inter|Manrope|DM Sans|Nunito Sans|Plus Jakarta Sans"}.\n\nArti layout: centered = navigasi horizontal/topbar untuk booking, kalender, atau layanan; split = sidebar ringkas untuk operasi; split-reverse = panel navigasi kanan untuk pendidikan/kreatif; sidebar = kontrol cepat untuk kasir/retail; glass = workspace ringan untuk layanan modern.\nArti dashboardStyle: commerce = kartu kasir/retail; operations = tabel dan proses kerja padat; studio = bento kreatif dengan visual lembut; executive = ringkas, formal, banyak ruang kosong; schedule = agenda/booking terstruktur.\nArti loginStyle: split = halaman merek dua panel; spotlight = kartu masuk terpusat dengan latar elegan; editorial = panel merek sempit dan form lega; showcase = halaman merek yang kuat dengan kartu mengambang; minimal = masuk yang sangat ringkas dan formal. Pilih masing-masing satu yang paling relevan dengan bisnis. Gunakan warna yang memiliki karakter industri, kontras aksesibel, dan hindari hijau default kecuali memang cocok.`;
   const response = await fetch(endpoint, {
     method: 'POST',
     headers: { Authorization: `Bearer ${config.api_key}`, 'Content-Type': 'application/json' },

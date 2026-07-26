@@ -427,7 +427,8 @@ async function main() {
         const aiResult = await promptAndGenerateAiTheme(displayName, profile, defaultTheme);
         visualTheme = aiResult.theme;
         if (aiResult.used) {
-          logSuccess(`Tema AI berhasil dibuat: ${visualTheme.name} (${visualTheme.layout}), provider ${aiResult.provider}, model ${aiResult.model}.`);
+          logSuccess(`Desain AI berhasil dibuat: ${visualTheme.name} — login ${visualTheme.loginStyle}, layout ${visualTheme.layout}, gaya ${visualTheme.dashboardStyle}, provider ${aiResult.provider}, model ${aiResult.model}.`);
+          logInfo(`  Palet: ${visualTheme.primary} / ${visualTheme.secondary}; font: ${visualTheme.fontFamily || 'font profesional bawaan'}.`);
         } else {
           logInfo(`Tema bawaan dipakai: ${visualTheme.name} (${visualTheme.layout}).`);
         }
