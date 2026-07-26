@@ -1,6 +1,7 @@
 node_modules/
 project/
 webmigrasi/
+apkmigrasi/
 .clasprc.json
 authsesion.json
 api.txt

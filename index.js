@@ -34,8 +34,9 @@ import { getAppHtmlTemplate } from './templates/appHtmlV3.js';
 import { getAppsscriptJsonTemplate } from './templates/appsscriptJson.js';
 import { PROJECT_TYPE_CHOICES, getProjectProfile } from './templates/projectProfiles.js';
 import { getRandomVisualTheme } from './templates/visualThemes.js';
-import { promptAndGenerateAiTheme, analyzeMigrationBuildError, analyzeGasMigrationProject, createMigrationTemplateBlueprint, analyzeGasAppRequirements, reviewMigratedNextApp, requestMigrationAutoRepair, requestGasAutoRepair } from './templates/aiTheme.js';
+import { promptAndGenerateAiTheme, analyzeMigrationBuildError, analyzeGasMigrationProject, createMigrationTemplateBlueprint, analyzeGasAppRequirements, reviewMigratedNextApp, requestMigrationAutoRepair, requestGasAutoRepair, analyzeMobileApp, reviewMobileWrapper } from './templates/aiTheme.js';
 import { getNextMigrationFiles } from './templates/nextJsMigration.js';
+import { getMobileWrapperFiles } from './templates/mobileApp.js';
 import { findBestMigrationTemplate, saveMigrationTemplate } from './templates/migrationTemplateLibrary.js';
 import { findGasBlueprint, saveGasBlueprint, applyGasBlueprint } from './templates/gasAppTemplateLibrary.js';
 
@@ -50,6 +51,7 @@ const __dirname = path.dirname(__filename);
 const ROOT_DIR = __dirname;
 const PROJECT_CONTAINER_DIR = path.join(ROOT_DIR, 'project');
 const MIGRATION_CONTAINER_DIR = path.join(ROOT_DIR, 'webmigrasi');
+const MOBILE_CONTAINER_DIR = path.join(ROOT_DIR, 'apkmigrasi');
 const GENERATOR_STATE_PATH = path.join(ROOT_DIR, 'authsesion.json');
 
 // ------------------------------------------------------------------
@@ -85,11 +87,54 @@ function logInfo(text) {
 // (dipakai untuk clasp login, clasp create, clasp push agar
 //  prompt/browser bawaan clasp tetap bisa muncul normal)
 // ------------------------------------------------------------------
-async function runInteractive(command, args, cwd) {
+async function runInteractive(command, args, cwd, env = undefined) {
   return execa(command, args, {
     cwd,
-    stdio: 'inherit'
+    stdio: 'inherit',
+    env: env ? { ...process.env, ...env } : process.env
   });
+}
+
+async function findJavaHome() {
+  const candidates = [
+    process.env.JAVA_HOME,
+    'D:\\android studio\\jbr',
+    'C:\\Program Files\\Android\\Android Studio\\jbr'
+  ].filter(Boolean);
+  for (const candidate of candidates) {
+    if (await fs.pathExists(path.join(candidate, 'bin', 'java.exe'))) return candidate;
+  }
+  return null;
+}
+
+async function findAndroidSdk() {
+  const candidates = [
+    process.env.ANDROID_HOME,
+    process.env.ANDROID_SDK_ROOT,
+    'D:\\android studio\\Sdk',
+    path.join(process.env.LOCALAPPDATA || '', 'Android', 'Sdk'),
+    'C:\\Android\\Sdk'
+  ].filter(Boolean);
+  for (const candidate of candidates) {
+    if (await fs.pathExists(path.join(candidate, 'platform-tools', 'adb.exe'))) return candidate;
+  }
+  return null;
+}
+
+async function getAndroidBuildEnv() {
+  const javaHome = await findJavaHome();
+  const androidSdk = await findAndroidSdk();
+  if (!javaHome || !androidSdk) return null;
+  const currentPath = process.env.Path || process.env.PATH || '';
+  const toolPath = `${path.join(javaHome, 'bin')};${path.join(androidSdk, 'platform-tools')};${path.join(androidSdk, 'emulator')};${currentPath}`;
+  return { JAVA_HOME: javaHome, ANDROID_HOME: androidSdk, ANDROID_SDK_ROOT: androidSdk, Path: toolPath, PATH: toolPath };
+}
+
+async function configureAndroidLocalProperties(targetDir, androidEnv) {
+  const androidDir = path.join(targetDir, 'android');
+  if (!await fs.pathExists(androidDir)) return;
+  const sdkPath = androidEnv.ANDROID_HOME.replace(/\\/g, '\\\\');
+  await fs.writeFile(path.join(androidDir, 'local.properties'), `sdk.dir=${sdkPath}\n`, 'utf8');
 }
 
 async function runNextBuild(cwd) {
@@ -149,7 +194,9 @@ async function promptOperation() {
   return inquirer.prompt([{
     type: 'list', name: 'operation', message: 'Pilih mode tools:', choices: [
       { name: '1. WebApp New — buat dan deploy GAS Web App', value: 'generate' },
-      { name: '2. Migrasi Project — ubah proyek GAS menjadi Next.js', value: 'migrate' }
+      { name: '2. Migrasi Project — ubah proyek GAS menjadi Next.js', value: 'migrate' },
+      { name: '3. Mobile App — buat APK / iOS wrapper dari web yang sudah deploy', value: 'mobile' },
+      { name: '4. Cek Aplikasi — jalankan hasil APK wrapper di Android Emulator', value: 'check-mobile' }
     ]
   }]);
 }
@@ -320,6 +367,297 @@ async function runNextMigration() {
   } else if (!deploy) {
     logInfo('Deploy manual: cd webmigrasi/' + sourceName + ' && npm install && npx vercel --prod');
   }
+}
+
+async function getAndroidDevices(androidEnv = null) {
+  try {
+    const androidSdk = androidEnv?.ANDROID_HOME;
+    const adb = androidSdk ? path.join(androidSdk, 'platform-tools', 'adb.exe') : 'adb';
+    const result = await execa(adb, ['devices'], { env: androidEnv ? { ...process.env, ...androidEnv } : process.env });
+    return result.stdout.split(/\r?\n/).slice(1).map(line => line.trim().split(/\s+/)).filter(parts => parts[0] && parts[1] === 'device').map(parts => parts[0]);
+  } catch {
+    return [];
+  }
+}
+
+async function waitForAndroidDevice(androidEnv, timeoutMs = 60000) {
+  const startedAt = Date.now();
+  while (Date.now() - startedAt < timeoutMs) {
+    const devices = await getAndroidDevices(androidEnv);
+    if (devices.length) return devices[0];
+    await new Promise(resolve => setTimeout(resolve, 3000));
+  }
+  return null;
+}
+
+async function findAndroidAvdManager(androidSdk) {
+  const toolsDir = path.join(androidSdk, 'cmdline-tools');
+  if (!await fs.pathExists(toolsDir)) return null;
+  const entries = await fs.readdir(toolsDir, { withFileTypes: true });
+  for (const entry of entries) {
+    const candidate = path.join(toolsDir, entry.name, 'bin', 'avdmanager.bat');
+    if (entry.isDirectory() && await fs.pathExists(candidate)) return candidate;
+  }
+  return null;
+}
+
+async function getAndroidSystemImages(androidSdk) {
+  const root = path.join(androidSdk, 'system-images');
+  if (!await fs.pathExists(root)) return [];
+  const images = [];
+  const apiDirs = await fs.readdir(root, { withFileTypes: true });
+  for (const apiDir of apiDirs) {
+    if (!apiDir.isDirectory()) continue;
+    const vendorPath = path.join(root, apiDir.name);
+    const vendorDirs = await fs.readdir(vendorPath, { withFileTypes: true });
+    for (const vendorDir of vendorDirs) {
+      if (!vendorDir.isDirectory()) continue;
+      const abiPath = path.join(vendorPath, vendorDir.name);
+      const abiDirs = await fs.readdir(abiPath, { withFileTypes: true });
+      for (const abiDir of abiDirs) {
+        if (abiDir.isDirectory() && await fs.pathExists(path.join(abiPath, abiDir.name, 'package.xml'))) {
+          images.push(`system-images;${apiDir.name};${vendorDir.name};${abiDir.name}`);
+        }
+      }
+    }
+  }
+  return images;
+}
+
+async function openAndroidProjectInStudio(targetDir) {
+  const studioCandidates = [
+    'D:\\android studio\\bin\\studio64.exe',
+    'C:\\Program Files\\Android\\Android Studio\\bin\\studio64.exe'
+  ];
+  const studio = studioCandidates.find(candidate => fs.existsSync(candidate));
+  if (!studio) {
+    logInfo('Android Studio tidak ditemukan otomatis. Buka folder android/ dari proyek mobile secara manual di Android Studio.');
+    return false;
+  }
+  const androidDir = path.join(targetDir, 'android');
+  const child = execa(studio, [androidDir], { detached: true, stdio: 'ignore' });
+  child.catch(() => {});
+  child.unref();
+  logSuccess('Proyek Android dibuka di Android Studio. APK debug juga tersedia di folder apkmigrasi proyek ini.');
+  return true;
+}
+
+async function offerAndroidAvdSetup(androidEnv, targetDir) {
+  const { ANDROID_HOME: androidSdk } = androidEnv;
+  const avdManager = await findAndroidAvdManager(androidSdk);
+  const images = await getAndroidSystemImages(androidSdk);
+  if (avdManager && images.length) {
+    const { createAvd } = await inquirer.prompt([{ type: 'confirm', name: 'createAvd', message: 'Belum ada emulator. Buat Android Virtual Device standar otomatis sekarang?', default: true }]);
+    if (!createAvd) return false;
+    const image = images[0];
+    const avdName = `GAS_WebApp_API_${image.split(';')[1].replace(/[^a-z0-9]/gi, '_')}`;
+    try {
+      await execa(avdManager, ['create', 'avd', '--force', '--name', avdName, '--package', image, '--device', 'pixel_6'], {
+        input: 'no\n',
+        env: { ...process.env, ...androidEnv }
+      });
+      logSuccess(`Android Emulator otomatis dibuat: ${avdName}`);
+      return true;
+    } catch (err) {
+      logError(`Pembuatan emulator otomatis gagal: ${err.shortMessage || err.message}`);
+      return false;
+    }
+  }
+
+  logInfo('SDK belum memiliki System Image atau Android SDK Command-line Tools, sehingga emulator belum dapat dibuat otomatis.');
+  const studioAvailable = await fs.pathExists('D:\\android studio\\bin\\studio64.exe') || await fs.pathExists('C:\\Program Files\\Android\\Android Studio\\bin\\studio64.exe');
+  if (studioAvailable) {
+    const { openStudio } = await inquirer.prompt([{ type: 'confirm', name: 'openStudio', message: 'Buka Android Studio sekarang untuk membuat emulator?', default: true }]);
+    if (openStudio) {
+      await openAndroidProjectInStudio(targetDir);
+      logInfo('Di Android Studio buka Tools > Device Manager > Create Device. Jika diminta, unduh System Image lalu selesaikan pembuatan AVD.');
+    }
+  }
+  return false;
+}
+
+async function runAndroidEmulatorTest(targetDir) {
+  const androidEnv = await getAndroidBuildEnv();
+  if (!androidEnv) {
+    logError('JDK atau Android SDK tidak ditemukan. Pastikan Android Studio SDK telah terpasang.');
+    return;
+  }
+  const emulator = path.join(androidEnv.ANDROID_HOME, 'emulator', 'emulator.exe');
+  if (!await fs.pathExists(emulator)) {
+    logError('Android Emulator belum terpasang di SDK. Install Android Emulator melalui Android Studio > SDK Manager > SDK Tools.');
+    return;
+  }
+  let device = (await getAndroidDevices(androidEnv))[0];
+  if (!device) {
+    let avds = [];
+    try {
+      const result = await execa(emulator, ['-list-avds'], { env: { ...process.env, ...androidEnv } });
+      avds = result.stdout.split(/\r?\n/).map(value => value.trim()).filter(Boolean);
+    } catch {
+      logError('Android Emulator/adb tidak dapat dijalankan. Periksa instalasi Android SDK melalui Android Studio > SDK Manager.');
+      return;
+    }
+    if (!avds.length) {
+      const created = await offerAndroidAvdSetup(androidEnv, targetDir);
+      if (!created) return;
+      const refreshed = await execa(emulator, ['-list-avds'], { env: { ...process.env, ...androidEnv } });
+      avds = refreshed.stdout.split(/\r?\n/).map(value => value.trim()).filter(Boolean);
+      if (!avds.length) {
+        logError('Android Virtual Device belum tersedia setelah setup. Selesaikan pembuatan AVD di Android Studio lalu jalankan kembali menu Cek Aplikasi.');
+        return;
+      }
+    }
+    const { avd } = await inquirer.prompt([{ type: 'list', name: 'avd', message: 'Pilih Android Emulator untuk testing:', choices: avds }]);
+    logStep(`Menyalakan Android Emulator: ${avd}...`);
+    try {
+      const child = execa(emulator, ['-avd', avd], { detached: true, stdio: 'ignore', env: { ...process.env, ...androidEnv } });
+      child.catch(() => {});
+      child.unref();
+    } catch (err) {
+      logError(`Gagal menyalakan emulator: ${err.message}`);
+      return;
+    }
+    logInfo('Menunggu emulator siap (maks. 60 detik)...');
+    device = await waitForAndroidDevice(androidEnv);
+  }
+  if (!device) {
+    logError('Emulator belum siap. Nyalakan emulator melalui Android Studio lalu pilih mode Mobile App lagi untuk menjalankan aplikasi.');
+    return;
+  }
+  try {
+    logStep(`Menjalankan aplikasi pada emulator ${device}...`);
+    await configureAndroidLocalProperties(targetDir, androidEnv);
+    await runInteractive('npx', ['cap', 'run', 'android', '--target', device], targetDir, androidEnv);
+    logSuccess('Aplikasi mobile sudah dibuka di Android Emulator.');
+  } catch (err) {
+    logError('Aplikasi belum dapat dijalankan di emulator. Periksa Android SDK, JDK, dan log Gradle di atas.');
+  }
+}
+
+async function runMobileWrapperBuild() {
+  const candidates = [];
+  if (await fs.pathExists(MIGRATION_CONTAINER_DIR)) {
+    for (const entry of await fs.readdir(MIGRATION_CONTAINER_DIR, { withFileTypes: true })) {
+      if (entry.isDirectory() && await fs.pathExists(path.join(MIGRATION_CONTAINER_DIR, entry.name, 'package.json'))) {
+        candidates.push({ name: `${entry.name} (Next.js hasil migrasi)`, value: entry.name });
+      }
+    }
+  }
+  if (!candidates.length) throw new Error('Belum ada hasil migrasi Next.js di folder webmigrasi/. Jalankan menu Migrasi Project terlebih dahulu.');
+  const answer = await inquirer.prompt([
+    { type: 'list', name: 'sourceName', message: 'Pilih web yang akan dibuat menjadi aplikasi mobile:', choices: candidates },
+    { type: 'input', name: 'appUrl', message: 'Masukkan URL web yang sudah deploy (HTTPS):', validate: value => /^https:\/\//i.test(value.trim()) ? true : 'URL HTTPS wajib diisi, misalnya URL Vercel atau Web App GAS /exec.' },
+    { type: 'input', name: 'appId', message: 'Application ID (format com.nama.aplikasi):', default: answers => `com.webapp.${String(answers.sourceName || 'mobile').replace(/[^a-z0-9]/gi, '').toLowerCase() || 'mobile'}`, validate: value => /^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*){1,}$/.test(value.trim()) ? true : 'Gunakan format seperti com.nama.aplikasi.' },
+    { type: 'checkbox', name: 'platforms', message: 'Platform yang disiapkan:', choices: [{ name: 'Android (APK/AAB)', value: 'android', checked: true }, { name: 'iOS (membutuhkan macOS/Xcode)', value: 'ios' }], validate: value => value.length ? true : 'Pilih minimal satu platform.' },
+    { type: 'confirm', name: 'buildNow', message: 'Pasang dependensi dan jalankan build platform yang tersedia sekarang?', default: true },
+    { type: 'confirm', name: 'testAndroid', message: 'Setelah build, buka aplikasi langsung di Android Studio Emulator?', default: true, when: answers => answers.platforms.includes('android') }
+  ]);
+  logStep('AI Mobile Preflight — memeriksa kesiapan URL, pengalaman mobile, dan checklist test...');
+  try {
+    const analysis = await analyzeMobileApp(answer.sourceName, answer.appUrl.trim());
+    if (analysis) {
+      logSuccess(`AI Mobile: ${analysis.summary || 'analisis selesai.'}`);
+      if (analysis.mobileFocus) logInfo(`Fokus mobile: ${analysis.mobileFocus}`);
+      if (analysis.risk) logInfo(`Risiko: ${analysis.risk}`);
+    } else logInfo('AI Mobile Preflight dilewati: api.txt belum tersedia atau tidak valid.');
+  } catch (err) {
+    logError(`AI Mobile Preflight gagal: ${err.message}`);
+    logInfo('Pembuatan wrapper dilanjutkan dengan konfigurasi aman.');
+  }
+  const folderName = answer.sourceName.toLowerCase().replace(/[^a-z0-9-_]/g, '-') || 'mobile-app';
+  const targetDir = path.join(MOBILE_CONTAINER_DIR, folderName);
+  if (await fs.pathExists(targetDir)) {
+    const { overwrite } = await inquirer.prompt([{ type: 'confirm', name: 'overwrite', message: `Folder apkmigrasi/${folderName} sudah ada. Timpa isinya?`, default: false }]);
+    if (!overwrite) throw new Error('Pembuatan aplikasi mobile dibatalkan.');
+    await fs.emptyDir(targetDir);
+  } else await fs.ensureDir(targetDir);
+  const files = getMobileWrapperFiles({ appName: answer.sourceName, appId: answer.appId.trim(), appUrl: answer.appUrl.trim() });
+  for (const [name, content] of Object.entries(files)) {
+    const filePath = path.join(targetDir, name);
+    await fs.ensureDir(path.dirname(filePath));
+    await fs.writeFile(filePath, content, 'utf8');
+  }
+  logSuccess(`Proyek mobile dibuat: ${targetDir}`);
+  try {
+    const qa = await reviewMobileWrapper(files);
+    if (qa) {
+      logInfo(`AI Mobile QA: ${qa.summary || qa.status}`);
+      if (qa.findings?.length) logInfo(`Temuan: ${qa.findings.join(' | ')}`);
+      if (qa.status !== 'ready') throw new Error('AI Mobile QA meminta review konfigurasi sebelum build.');
+    }
+  } catch (err) {
+    logError(`Mobile wrapper belum lolos QA: ${err.message}`);
+    return;
+  }
+  if (!answer.buildNow) {
+    logInfo(`Build manual: cd apkmigrasi/${folderName} && npm install && npm run sync`);
+    return;
+  }
+  logStep('Memasang Capacitor dan menyiapkan platform mobile...');
+  await runInteractive('npm', ['install'], targetDir);
+  for (const platform of answer.platforms) {
+    try {
+      await runInteractive('npx', ['cap', 'add', platform], targetDir);
+    } catch (err) {
+      logInfo(`Platform ${platform} sudah ada atau belum dapat ditambahkan: ${err.message}`);
+    }
+  }
+  await runInteractive('npx', ['cap', 'sync'], targetDir);
+  let androidBuildReady = false;
+  if (answer.platforms.includes('android')) {
+    try {
+      logStep('Membuat Android debug APK untuk testing...');
+      const androidEnv = await getAndroidBuildEnv();
+      if (!androidEnv) throw new Error('JDK atau Android SDK tidak ditemukan. Install komponen Android SDK melalui Android Studio.');
+      await configureAndroidLocalProperties(targetDir, androidEnv);
+      logInfo(`Menggunakan Java: ${androidEnv.JAVA_HOME}`);
+      logInfo(`Menggunakan Android SDK: ${androidEnv.ANDROID_HOME}`);
+      await runInteractive(path.join(targetDir, 'android', 'gradlew.bat'), ['assembleDebug'], path.join(targetDir, 'android'), androidEnv);
+      const builtApk = path.join(targetDir, 'android', 'app', 'build', 'outputs', 'apk', 'debug', 'app-debug.apk');
+      const convenientApk = path.join(targetDir, `${folderName}-debug.apk`);
+      if (!await fs.pathExists(builtApk)) throw new Error('APK debug tidak ditemukan setelah Gradle selesai.');
+      await fs.copy(builtApk, convenientApk, { overwrite: true });
+      androidBuildReady = true;
+      logSuccess(`Build Android debug selesai. APK siap pakai: ${convenientApk}`);
+      if (answer.testAndroid) await openAndroidProjectInStudio(targetDir);
+    } catch (err) {
+      logError('Build APK belum dapat dijalankan. Pastikan Android Studio, Android SDK, dan JDK telah terpasang.');
+    }
+    if (answer.testAndroid && androidBuildReady) await runAndroidEmulatorTest(targetDir);
+    if (answer.testAndroid && !androidBuildReady) logInfo('Emulator tidak dibuka karena build Android belum berhasil.');
+  }
+  if (answer.platforms.includes('ios')) {
+    if (process.platform !== 'darwin') logInfo('Project iOS sudah disiapkan, tetapi build iOS hanya bisa dijalankan dari macOS dengan Xcode dan signing Apple.');
+    else {
+      try {
+        logStep('Membuat build iOS...');
+        await runInteractive('npx', ['cap', 'build', 'ios'], targetDir);
+        logSuccess('Build iOS selesai; lanjutkan signing/distribusi melalui Xcode.');
+      } catch (err) { logError('Build iOS gagal. Periksa Xcode, provisioning profile, dan Apple Developer signing.'); }
+    }
+  }
+}
+
+async function runMobileAppCheck() {
+  if (!await fs.pathExists(MOBILE_CONTAINER_DIR)) throw new Error('Folder apkmigrasi/ belum ada. Buat aplikasi mobile terlebih dahulu dari menu Mobile App.');
+  const entries = await fs.readdir(MOBILE_CONTAINER_DIR, { withFileTypes: true });
+  const choices = [];
+  for (const entry of entries) {
+    if (entry.isDirectory() && await fs.pathExists(path.join(MOBILE_CONTAINER_DIR, entry.name, 'package.json'))) {
+      choices.push({ name: entry.name, value: entry.name });
+    }
+  }
+  if (!choices.length) throw new Error('Tidak ada aplikasi mobile yang siap dicek di folder apkmigrasi/.');
+  const { appName } = await inquirer.prompt([{ type: 'list', name: 'appName', message: 'Pilih aplikasi dari apkmigrasi/ untuk dijalankan:', choices }]);
+  const targetDir = path.join(MOBILE_CONTAINER_DIR, appName);
+  if (!await fs.pathExists(path.join(targetDir, 'android'))) {
+    logInfo('Platform Android belum disiapkan. Menjalankan sinkronisasi Capacitor terlebih dahulu...');
+    await runInteractive('npm', ['install'], targetDir);
+    try { await runInteractive('npx', ['cap', 'add', 'android'], targetDir); } catch (err) { logError(`Platform Android tidak dapat ditambahkan: ${err.message}`); return; }
+    await runInteractive('npx', ['cap', 'sync'], targetDir);
+  }
+  logStep(`Menjalankan aplikasi ${appName} di Android Emulator...`);
+  await runAndroidEmulatorTest(targetDir);
 }
 
 async function repairKnownMigrationError(targetDir, buildError) {
@@ -770,6 +1108,14 @@ async function main() {
       const { operation } = await promptOperation();
       if (operation === 'migrate') {
         await runNextMigration();
+        continue;
+      }
+      if (operation === 'mobile') {
+        await runMobileWrapperBuild();
+        continue;
+      }
+      if (operation === 'check-mobile') {
+        await runMobileAppCheck();
         continue;
       }
       if (!await initializeGas()) continue;

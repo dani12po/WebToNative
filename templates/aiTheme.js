@@ -188,3 +188,34 @@ export async function requestGasAutoRepair(issue, files) {
   }
   throw new Error(`AI perbaikan GAS mengirim JSON tidak valid: ${lastError?.message || 'unknown error'}`);
 }
+
+export async function analyzeMobileApp(projectName, appUrl) {
+  const configPath = new URL('../api.txt', import.meta.url);
+  let text;
+  try { text = await fs.readFile(configPath, 'utf8'); } catch { return null; }
+  const config = Object.fromEntries(text.split(/\r?\n/).map(line => line.trim()).filter(line => line && !line.startsWith('#')).map(line => { const index = line.indexOf('='); return index === -1 ? ['', ''] : [line.slice(0, index).trim().toLowerCase(), line.slice(index + 1).trim()]; }).filter(([key]) => key));
+  const provider = (config.provider || '').toLowerCase();
+  const endpoint = provider === 'custom' ? config.endpoint : PROVIDERS[provider]?.endpoint;
+  if (!config.api_key || !config.model || !endpoint || !/^https:\/\//.test(endpoint)) return null;
+  const prompt = `Anda adalah mobile product QA untuk aplikasi Capacitor. Analisis rencana wrapper aplikasi mobile ini. Jawab JSON saja: {"summary":"maksimal 160 karakter","mobileFocus":"maksimal 120 karakter","testChecklist":["maksimal 4 tes"],"risk":"maksimal 140 karakter"}. Jangan memberi kode, jangan mengarang integrasi native, dan jangan meminta kredensial.\nNama aplikasi: ${projectName}\nURL aplikasi web: ${appUrl}`;
+  const response = await fetch(endpoint, { method: 'POST', headers: { Authorization: `Bearer ${config.api_key}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ model: config.model, messages: [{ role: 'user', content: prompt }], temperature: 0.15 }) });
+  if (!response.ok) throw new Error(`AI Mobile Preflight gagal (HTTP ${response.status}).`);
+  const result = extractJson((await response.json()).choices?.[0]?.message?.content || '');
+  return { summary: String(result.summary || '').slice(0, 160), mobileFocus: String(result.mobileFocus || '').slice(0, 120), testChecklist: Array.isArray(result.testChecklist) ? result.testChecklist.slice(0, 4).map(String) : [], risk: String(result.risk || '').slice(0, 140), provider, model: config.model };
+}
+
+export async function reviewMobileWrapper(files) {
+  const configPath = new URL('../api.txt', import.meta.url);
+  let text;
+  try { text = await fs.readFile(configPath, 'utf8'); } catch { return null; }
+  const config = Object.fromEntries(text.split(/\r?\n/).map(line => line.trim()).filter(line => line && !line.startsWith('#')).map(line => { const index = line.indexOf('='); return index === -1 ? ['', ''] : [line.slice(0, index).trim().toLowerCase(), line.slice(index + 1).trim()]; }).filter(([key]) => key));
+  const provider = (config.provider || '').toLowerCase();
+  const endpoint = provider === 'custom' ? config.endpoint : PROVIDERS[provider]?.endpoint;
+  if (!config.api_key || !config.model || !endpoint || !/^https:\/\//.test(endpoint)) return null;
+  const source = Object.entries(files).map(([name, value]) => `FILE: ${name}\n${String(value).slice(0, 6000)}`).join('\n\n').slice(0, 14000);
+  const prompt = `Anda adalah QA aplikasi Capacitor. Tinjau konfigurasi wrapper berikut. Jawab JSON saja: {"status":"ready|needs_review","summary":"maksimal 160 karakter","findings":["maksimal 3 temuan konkret"],"nextStep":"maksimal 120 karakter"}. Status needs_review hanya bila URL bukan HTTPS, appId invalid, atau konfigurasi Capacitor tidak dapat dipakai. Jangan menuntut build iOS pada Windows.\n\n${source}`;
+  const response = await fetch(endpoint, { method: 'POST', headers: { Authorization: `Bearer ${config.api_key}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ model: config.model, messages: [{ role: 'user', content: prompt }], temperature: 0.1 }) });
+  if (!response.ok) throw new Error(`AI Mobile QA gagal (HTTP ${response.status}).`);
+  const result = extractJson((await response.json()).choices?.[0]?.message?.content || '');
+  return { status: result.status === 'ready' ? 'ready' : 'needs_review', summary: String(result.summary || '').slice(0, 160), findings: Array.isArray(result.findings) ? result.findings.slice(0, 3).map(String) : [], nextStep: String(result.nextStep || '').slice(0, 120), provider, model: config.model };
+}
