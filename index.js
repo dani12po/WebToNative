@@ -895,6 +895,11 @@ async function runClaspCreate(projectDir, displayName) {
     if (!claspConfig.scriptId) {
       throw new Error('scriptId tidak ditemukan di file .clasp.json.');
     }
+    // Manifest harus selalu ikut dalam push. Urutan eksplisit ini juga membuat
+    // clasp memproses konfigurasi Web App sebelum file server/client lainnya.
+    claspConfig.rootDir = '.';
+    claspConfig.filePushOrder = ['appsscript.json', 'Database.gs', 'Code.gs', 'app.html'];
+    await fs.writeJson(claspJsonPath, claspConfig, { spaces: 2 });
 
     logSuccess('Proyek Apps Script berhasil dibuat (clasp create).');
   } catch (err) {
@@ -937,8 +942,21 @@ async function generateProjectFiles(projectDir, displayName, profile, visualThem
 async function runClaspPush(projectDir) {
   logStep('Mengunggah kode ke server Google Apps Script (clasp push)...');
   try {
+    const manifestPath = path.join(projectDir, 'appsscript.json');
+    if (!await fs.pathExists(manifestPath)) {
+      throw new Error('appsscript.json tidak ditemukan; deployment dihentikan agar manifest Web App tidak terlewat.');
+    }
+    try {
+      const manifest = await fs.readJson(manifestPath);
+      if (!manifest.runtimeVersion || !manifest.webapp) {
+        throw new Error('Manifest harus memiliki runtimeVersion dan konfigurasi webapp.');
+      }
+    } catch (manifestError) {
+      throw new Error(`appsscript.json tidak valid: ${manifestError.message}`);
+    }
+    logInfo('Manifest appsscript.json tervalidasi dan disertakan dalam clasp push.');
     await runInteractive('clasp', ['push', '--force'], projectDir);
-    logSuccess('Kode berhasil diunggah ke Google Apps Script.');
+    logSuccess('Kode dan manifest appsscript.json berhasil diunggah ke Google Apps Script.');
   } catch (err) {
     throw new Error('Gagal menjalankan clasp push: ' + err.message);
   }
