@@ -14,7 +14,19 @@ const PROFILES = {
   bimba: { name: 'BIMBA / Pendidikan', icon: 'A+', tagline: 'Kelola siswa, kehadiran, kelas, dan iuran dalam satu sistem.', recordLabel: 'Data siswa', sheetName: 'Siswa', fields: [{ key: 'nama', label: 'Nama siswa', type: 'text' }, { key: 'kelas', label: 'Kelas', type: 'text' }, { key: 'wali', label: 'Nama wali', type: 'text' }, { key: 'status', label: 'Status', type: 'select', options: ['Aktif', 'Nonaktif'] }] }
 };
 
+const text = (key, label) => ({ key, label, type: 'text' });
+const number = (key, label) => ({ key, label, type: 'number' });
+const date = (key, label) => ({ key, label, type: 'date' });
+const select = (key, label, options) => ({ key, label, type: 'select', options });
+
 const MODULES_BY_TYPE = {
+  laundry: [
+    { id: 'order', name: 'Order Laundry', icon: 'O', fields: [text('pelanggan', 'Nama pelanggan'), text('layanan', 'Layanan'), number('berat', 'Berat (kg)'), number('harga', 'Harga per kg (Rp)'), number('diskon', 'Diskon (Rp)'), number('total', 'Total tagihan (Rp)'), select('metodeBayar', 'Metode pembayaran', ['Tunai', 'QRIS', 'Transfer']), select('statusBayar', 'Status pembayaran', ['Belum dibayar', 'DP', 'Lunas']), select('statusOrder', 'Status order', ['Diterima', 'Dicuci', 'Dikeringkan', 'Disetrika', 'Siap diambil', 'Selesai'])] },
+    { id: 'layanan', name: 'Layanan & Harga', icon: '$', adminOnly: true, fields: [text('layanan', 'Nama layanan'), number('harga', 'Harga dasar / kg (Rp)'), text('satuan', 'Satuan'), select('status', 'Status layanan', ['Aktif', 'Nonaktif'])] },
+    { id: 'pelanggan', name: 'Pelanggan', icon: 'P', adminOnly: true, fields: [text('nama', 'Nama pelanggan'), text('telepon', 'Nomor telepon'), text('alamat', 'Alamat'), select('status', 'Status', ['Aktif', 'Nonaktif'])] },
+    { id: 'pembayaran', name: 'Pembayaran', icon: 'Rp', adminOnly: true, fields: [text('order', 'ID / nama order'), number('nominal', 'Nominal pembayaran (Rp)'), select('metode', 'Metode', ['Tunai', 'QRIS', 'Transfer']), select('status', 'Status', ['Menunggu', 'Terverifikasi', 'Lunas'])] },
+    { id: 'laporan', name: 'Laporan', icon: '#', adminOnly: true, fields: [text('periode', 'Periode'), number('pendapatan', 'Total pendapatan (Rp)'), number('biaya', 'Total biaya (Rp)'), text('catatan', 'Catatan laporan')] }
+  ],
   cashier: [
     { id: 'transaksi', name: 'Transaksi', icon: '↗', fields: PROFILES.cashier.fields },
     { id: 'produk', name: 'Produk', icon: '□', adminOnly: true, fields: [{ key: 'nama', label: 'Nama produk', type: 'text' }, { key: 'harga', label: 'Harga (Rp)', type: 'number' }, { key: 'stok', label: 'Stok', type: 'number' }] },
@@ -38,6 +50,62 @@ const MODULES_BY_TYPE = {
   ]
 };
 
+const preset = (id, name, icon, tagline, recordLabel, fields) => ({ id, name, icon, tagline, recordLabel, sheetName: recordLabel, fields });
+
+const EXTRA_TEMPLATES = [
+  preset('restaurant', 'Restoran', 'R', 'Kelola pesanan meja dan pelayanan pelanggan.', 'Pesanan', [text('pelanggan', 'Nama pelanggan'), text('menu', 'Menu'), number('total', 'Total (Rp)'), select('status', 'Status', ['Baru', 'Dimasak', 'Selesai'])]),
+  preset('coffee', 'Coffee Shop', 'C', 'Catat pesanan minuman dan transaksi harian.', 'Pesanan minuman', [text('menu', 'Menu minuman'), number('jumlah', 'Jumlah'), number('total', 'Total (Rp)'), select('metode', 'Metode bayar', ['Tunai', 'QRIS', 'Kartu'])]),
+  preset('ecommerce', 'E-Commerce', 'E', 'Kelola order online, pelanggan, dan pengiriman.', 'Order', [text('pelanggan', 'Nama pelanggan'), text('produk', 'Produk'), number('total', 'Total (Rp)'), select('status', 'Status order', ['Baru', 'Diproses', 'Dikirim', 'Selesai'])]),
+  preset('fashion', 'Toko Fashion', 'F', 'Pantau penjualan pakaian dan stok koleksi.', 'Penjualan', [text('produk', 'Nama produk'), text('ukuran', 'Ukuran'), number('jumlah', 'Jumlah'), number('total', 'Total (Rp)')]),
+  preset('salon', 'Salon & Beauty', 'S', 'Atur layanan kecantikan dan jadwal pelanggan.', 'Layanan salon', [text('pelanggan', 'Nama pelanggan'), text('layanan', 'Layanan'), date('tanggal', 'Tanggal'), select('status', 'Status', ['Booking', 'Dikerjakan', 'Selesai'])]),
+  preset('gym', 'Gym & Fitness', 'G', 'Kelola anggota, paket, dan aktivitas kebugaran.', 'Aktivitas anggota', [text('anggota', 'Nama anggota'), text('paket', 'Paket'), date('tanggal', 'Tanggal'), select('status', 'Status', ['Aktif', 'Selesai'])]),
+  preset('hotel', 'Hotel & Homestay', 'H', 'Kelola reservasi kamar dan data tamu.', 'Reservasi kamar', [text('tamu', 'Nama tamu'), text('kamar', 'Nomor kamar'), date('checkin', 'Tanggal check-in'), select('status', 'Status', ['Booking', 'Check-in', 'Check-out'])]),
+  preset('travel', 'Travel & Tour', 'T', 'Atur perjalanan, penumpang, dan jadwal keberangkatan.', 'Pemesanan travel', [text('penumpang', 'Nama penumpang'), text('tujuan', 'Tujuan'), date('tanggal', 'Tanggal berangkat'), select('status', 'Status', ['Pesan', 'Lunas', 'Berangkat'])]),
+  preset('logistics', 'Logistik', 'L', 'Pantau pengiriman dan status paket pelanggan.', 'Pengiriman', [text('pengirim', 'Nama pengirim'), text('tujuan', 'Tujuan'), text('resi', 'Nomor resi'), select('status', 'Status', ['Diterima', 'Transit', 'Terkirim'])]),
+  preset('warehouse', 'Gudang', 'W', 'Kelola penerimaan dan pengeluaran barang gudang.', 'Pergerakan barang', [text('barang', 'Nama barang'), number('jumlah', 'Jumlah'), select('jenis', 'Jenis', ['Masuk', 'Keluar']), text('lokasi', 'Lokasi rak')]),
+  preset('agriculture', 'Pertanian', 'A', 'Catat kegiatan kebun, panen, dan hasil produksi.', 'Kegiatan kebun', [text('tanaman', 'Jenis tanaman'), date('tanggal', 'Tanggal'), text('kegiatan', 'Kegiatan'), number('hasil', 'Hasil panen (kg)')]),
+  preset('farm', 'Peternakan', 'P', 'Pantau ternak, pakan, dan hasil produksi.', 'Catatan ternak', [text('ternak', 'Jenis ternak'), text('kegiatan', 'Kegiatan'), number('jumlah', 'Jumlah'), date('tanggal', 'Tanggal')]),
+  preset('petshop', 'Pet Shop', 'P', 'Kelola layanan hewan dan data pelanggan.', 'Layanan hewan', [text('pemilik', 'Nama pemilik'), text('hewan', 'Nama hewan'), text('layanan', 'Layanan'), select('status', 'Status', ['Booking', 'Diproses', 'Selesai'])]),
+  preset('workshop', 'Bengkel', 'B', 'Kelola servis kendaraan dan pekerjaan mekanik.', 'Tiket servis', [text('pelanggan', 'Nama pelanggan'), text('kendaraan', 'Kendaraan'), text('keluhan', 'Keluhan'), select('status', 'Status', ['Masuk', 'Dikerjakan', 'Selesai'])]),
+  preset('carwash', 'Car Wash', 'C', 'Atur antrean cuci kendaraan dan pembayaran.', 'Antrean cuci', [text('pelanggan', 'Nama pelanggan'), text('kendaraan', 'Kendaraan'), text('layanan', 'Paket cuci'), select('status', 'Status', ['Antre', 'Dicuci', 'Selesai'])]),
+  preset('photography', 'Fotografi', 'F', 'Kelola booking sesi foto dan proyek klien.', 'Sesi foto', [text('klien', 'Nama klien'), text('paket', 'Paket foto'), date('tanggal', 'Tanggal sesi'), select('status', 'Status', ['Booking', 'Pemotretan', 'Selesai'])]),
+  preset('realestate', 'Properti', 'P', 'Catat listing properti dan prospek pembeli.', 'Listing properti', [text('properti', 'Nama properti'), text('lokasi', 'Lokasi'), number('harga', 'Harga (Rp)'), select('status', 'Status', ['Tersedia', 'Dibooking', 'Terjual'])]),
+  preset('construction', 'Konstruksi', 'K', 'Pantau proyek lapangan dan progres pekerjaan.', 'Progres proyek', [text('proyek', 'Nama proyek'), text('tugas', 'Pekerjaan'), number('progres', 'Progres (%)'), select('status', 'Status', ['Rencana', 'Berjalan', 'Selesai'])]),
+  preset('legal', 'Kantor Hukum', 'H', 'Kelola perkara, klien, dan jadwal konsultasi.', 'Perkara', [text('klien', 'Nama klien'), text('perkara', 'Judul perkara'), date('tanggal', 'Tanggal'), select('status', 'Status', ['Baru', 'Berjalan', 'Selesai'])]),
+  preset('hr', 'HR & Karyawan', 'H', 'Kelola data karyawan dan aktivitas kepegawaian.', 'Data karyawan', [text('nama', 'Nama karyawan'), text('jabatan', 'Jabatan'), text('divisi', 'Divisi'), select('status', 'Status', ['Aktif', 'Cuti', 'Nonaktif'])]),
+  preset('recruitment', 'Rekrutmen', 'R', 'Pantau kandidat dan tahapan proses seleksi.', 'Kandidat', [text('nama', 'Nama kandidat'), text('posisi', 'Posisi dilamar'), text('kontak', 'Kontak'), select('tahap', 'Tahap', ['Masuk', 'Wawancara', 'Tes', 'Diterima'])]),
+  preset('payroll', 'Payroll', 'P', 'Catat komponen gaji dan pembayaran karyawan.', 'Pembayaran gaji', [text('karyawan', 'Nama karyawan'), text('periode', 'Periode'), number('nominal', 'Nominal (Rp)'), select('status', 'Status', ['Draft', 'Dibayar'])]),
+  preset('invoice', 'Invoice', 'I', 'Kelola tagihan dan status pembayaran pelanggan.', 'Invoice', [text('pelanggan', 'Nama pelanggan'), text('nomor', 'Nomor invoice'), number('total', 'Total (Rp)'), select('status', 'Status', ['Draft', 'Terkirim', 'Lunas'])]),
+  preset('donation', 'Donasi', 'D', 'Catat donasi dan program penyaluran dana.', 'Donasi', [text('donatur', 'Nama donatur'), text('program', 'Program'), number('nominal', 'Nominal (Rp)'), date('tanggal', 'Tanggal')]),
+  preset('cooperative', 'Koperasi', 'K', 'Kelola simpanan, pinjaman, dan anggota koperasi.', 'Transaksi koperasi', [text('anggota', 'Nama anggota'), select('jenis', 'Jenis transaksi', ['Simpanan', 'Pinjaman', 'Angsuran']), number('nominal', 'Nominal (Rp)'), date('tanggal', 'Tanggal')]),
+  preset('library', 'Perpustakaan', 'P', 'Catat koleksi buku dan transaksi peminjaman.', 'Peminjaman buku', [text('peminjam', 'Nama peminjam'), text('buku', 'Judul buku'), date('pinjam', 'Tanggal pinjam'), select('status', 'Status', ['Dipinjam', 'Dikembalikan'])]),
+  preset('school', 'Sekolah', 'S', 'Kelola siswa, kelas, dan aktivitas administrasi.', 'Data siswa', [text('nama', 'Nama siswa'), text('kelas', 'Kelas'), text('wali', 'Nama wali'), select('status', 'Status', ['Aktif', 'Nonaktif'])]),
+  preset('course', 'Kursus', 'K', 'Atur peserta kursus, kelas, dan progres belajar.', 'Peserta kursus', [text('nama', 'Nama peserta'), text('program', 'Program kursus'), text('pengajar', 'Pengajar'), select('status', 'Status', ['Aktif', 'Selesai'])]),
+  preset('pharmacy', 'Apotek', 'A', 'Kelola penjualan obat dan persediaan apotek.', 'Penjualan obat', [text('obat', 'Nama obat'), number('jumlah', 'Jumlah'), number('total', 'Total (Rp)'), select('status', 'Status', ['Terjual', 'Retur'])]),
+  preset('dental', 'Klinik Gigi', 'G', 'Atur pasien dan jadwal perawatan gigi.', 'Kunjungan pasien', [text('pasien', 'Nama pasien'), text('layanan', 'Perawatan'), date('tanggal', 'Tanggal'), select('status', 'Status', ['Booking', 'Diperiksa', 'Selesai'])]),
+  preset('catering', 'Catering', 'C', 'Kelola pesanan makanan dan jadwal pengantaran.', 'Pesanan catering', [text('pelanggan', 'Nama pelanggan'), text('paket', 'Paket catering'), date('tanggal', 'Tanggal kirim'), select('status', 'Status', ['Pesan', 'Dimasak', 'Dikirim'])]),
+  preset('delivery', 'Delivery Order', 'D', 'Pantau order antar dan kurir pengiriman.', 'Order pengantaran', [text('pelanggan', 'Nama pelanggan'), text('alamat', 'Alamat tujuan'), text('kurir', 'Nama kurir'), select('status', 'Status', ['Baru', 'Diantar', 'Terkirim'])]),
+  preset('marketplace', 'Marketplace Seller', 'M', 'Kelola order dari marketplace dan pengiriman.', 'Order marketplace', [text('marketplace', 'Marketplace'), text('produk', 'Produk'), number('total', 'Total (Rp)'), select('status', 'Status', ['Masuk', 'Dikemas', 'Dikirim'])]),
+  preset('membership', 'Membership', 'M', 'Kelola anggota dan masa aktif keanggotaan.', 'Anggota', [text('nama', 'Nama anggota'), text('paket', 'Paket'), date('berlaku', 'Berlaku sampai'), select('status', 'Status', ['Aktif', 'Berakhir'])]),
+  preset('survey', 'Survey & Feedback', 'S', 'Kumpulkan jawaban survey dan masukan pelanggan.', 'Respon survey', [text('responden', 'Nama responden'), text('topik', 'Topik survey'), select('nilai', 'Penilaian', ['Sangat baik', 'Baik', 'Cukup', 'Kurang']), text('catatan', 'Catatan')]),
+  preset('complaint', 'Pengaduan', 'P', 'Kelola laporan pengaduan dan tindak lanjut.', 'Pengaduan', [text('pelapor', 'Nama pelapor'), text('topik', 'Topik pengaduan'), text('detail', 'Detail'), select('status', 'Status', ['Baru', 'Diproses', 'Selesai'])]),
+  preset('helpdesk', 'Helpdesk IT', 'I', 'Kelola tiket bantuan dan penyelesaian masalah.', 'Tiket bantuan', [text('pelapor', 'Nama pelapor'), text('masalah', 'Masalah'), select('prioritas', 'Prioritas', ['Rendah', 'Sedang', 'Tinggi']), select('status', 'Status', ['Baru', 'Diproses', 'Selesai'])]),
+  preset('parking', 'Parkir', 'P', 'Catat kendaraan masuk dan keluar area parkir.', 'Aktivitas parkir', [text('plat', 'Nomor plat'), select('jenis', 'Jenis kendaraan', ['Motor', 'Mobil']), date('tanggal', 'Tanggal'), select('status', 'Status', ['Masuk', 'Keluar'])]),
+  preset('security', 'Keamanan', 'K', 'Catat patroli dan laporan keamanan harian.', 'Laporan keamanan', [text('petugas', 'Nama petugas'), text('lokasi', 'Lokasi'), text('kejadian', 'Catatan kejadian'), select('status', 'Status', ['Aman', 'Perlu tindak lanjut'])]),
+  preset('community', 'Komunitas', 'K', 'Kelola anggota, kegiatan, dan agenda komunitas.', 'Kegiatan komunitas', [text('kegiatan', 'Nama kegiatan'), date('tanggal', 'Tanggal'), text('penanggungJawab', 'Penanggung jawab'), select('status', 'Status', ['Rencana', 'Berjalan', 'Selesai'])]),
+  preset('posyandu', 'Posyandu', 'P', 'Catat layanan balita dan kegiatan kesehatan warga.', 'Kunjungan balita', [text('nama', 'Nama balita'), text('wali', 'Nama wali'), number('berat', 'Berat badan (kg)'), date('tanggal', 'Tanggal')])
+];
+
+EXTRA_TEMPLATES.forEach(function(template) { PROFILES[template.id] = template; });
+
+function defaultModules(profile) {
+  return [
+    { id: 'utama', name: profile.recordLabel, icon: profile.icon, fields: profile.fields },
+    { id: 'aktivitas', name: 'Aktivitas', icon: '+', fields: [text('judul', 'Judul aktivitas'), text('catatan', 'Catatan'), select('status', 'Status', ['Baru', 'Diproses', 'Selesai'])] },
+    { id: 'laporan', name: 'Laporan', icon: '#', adminOnly: true, fields: [text('periode', 'Periode'), text('ringkasan', 'Ringkasan laporan')] }
+  ];
+}
+
 export const PROJECT_TYPE_CHOICES = Object.entries(PROFILES).map(([value, profile]) => ({ name: profile.name, value }));
 
 export function getProjectProfile(type) {
@@ -45,6 +113,6 @@ export function getProjectProfile(type) {
   return {
     id: type,
     ...profile,
-    modules: MODULES_BY_TYPE[type] || [{ id: 'utama', name: profile.recordLabel, icon: profile.icon, fields: profile.fields }]
+    modules: MODULES_BY_TYPE[type] || defaultModules(profile)
   };
 }
