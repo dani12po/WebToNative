@@ -31,11 +31,20 @@ const GUIDE_MENU_PANEL = `<section id="guidePage" class="is-hidden mx-auto max-w
 const GUIDE_PAGE_MOVE = `<script>(function(){const page=document.getElementById('guidePage');const target=document.querySelector('#dashboard section > div');if(page&&target)target.appendChild(page)})();</script>`;
 
 export function getAppHtmlTemplate(projectName, profile, theme) {
-  const specializedLayouts = { workshop: 'workshop' };
+  const specializedLayouts = {
+    workshop: 'workshop',
+    booking: 'centered', hotel: 'centered', travel: 'centered', event: 'centered',
+    cashier: 'sidebar', restaurant: 'sidebar', coffee: 'sidebar', ecommerce: 'sidebar',
+    laundry: 'glass', salon: 'glass', clinic: 'glass', dental: 'glass',
+    finance: 'glass', payroll: 'glass', invoice: 'glass',
+    bimba: 'split-reverse', school: 'split-reverse', course: 'split-reverse',
+    carwash: 'split', parking: 'split', logistics: 'split', warehouse: 'split',
+    legal: 'sidebar', hr: 'sidebar', recruitment: 'sidebar'
+  };
   const layout = specializedLayouts[profile.id] || theme.layout;
   const html = getBaseAppHtmlTemplate(projectName, profile, theme);
   return html
     .replace('</head>', `<style>:root{--primary:var(--p);--secondary:var(--s);--dark:var(--d)}body{font-family:'Plus Jakarta Sans','Manrope','DM Sans','Nunito Sans','Inter',ui-sans-serif,system-ui}.dark-mode{--bg:#0f172a;background:#0f172a;color:#e2e8f0}.dark-mode .card,.dark-mode #guideModal section,.dark-mode #paymentModal>div{background:#172033;color:#e2e8f0;border-color:#334155}.dark-mode input,.dark-mode select{background:#0f172a;color:#e2e8f0;border-color:#475569}.dark-mode .soft{background:#1e293b;color:#cbd5e1}.dark-mode .text-slate-500,.dark-mode .text-slate-600{color:#94a3b8}.dark-mode #tableBody tr{border-color:#334155}.dark-mode #tableHead{color:#cbd5e1}.dark-mode #guideModal .bg-slate-50{background:#1e293b}.dark-mode #themeToggleBtn{background:#1e293b;color:#e2e8f0;border-color:#475569}#guideBtn,#guideModal{display:none!important}#themeToggleBtn{display:inline-flex;align-items:center;justify-content:center;min-height:2.75rem;border:0!important;color:#fff!important;background:linear-gradient(135deg,var(--d),var(--p))!important;transition:transform .22s ease,box-shadow .22s ease,filter .22s ease}#themeToggleBtn:hover{transform:translateY(-2px);filter:brightness(1.08);box-shadow:0 10px 22px color-mix(in srgb,var(--p) 30%,transparent)}.card{animation:gasFadeUp .42s cubic-bezier(.2,.8,.2,1) both}.card:nth-child(2){animation-delay:.06s}@keyframes gasFadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}#paymentModal>div{animation:gasScale .24s cubic-bezier(.2,.8,.2,1)}@keyframes gasScale{from{opacity:0;transform:scale(.97)}to{opacity:1;transform:scale(1)}}@media(prefers-reduced-motion:reduce){*,*:before,*:after{animation-duration:.01ms!important;transition-duration:.01ms!important}}</style><style>${LAYOUT_CSS}</style></head>`)
     .replace('<body>', `<body class="dash-${layout}">`)
-    .replace('</body>', `${PAYMENT_PANEL}${PAYMENT_PRINT_FIX}${EXPERIENCE_PANEL}${GUIDE_MENU_PANEL}${GUIDE_PAGE_MOVE}</body>`);
+    .replace('</body>', `${EXPERIENCE_PANEL}${GUIDE_MENU_PANEL}${GUIDE_PAGE_MOVE}</body>`);
 }
