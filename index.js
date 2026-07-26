@@ -30,9 +30,10 @@ import { execa } from 'execa';
 
 import { getCodeGsTemplate } from './templates/codeGs.js';
 import { getDatabaseGsTemplate } from './templates/databaseGs.js';
-import { getAppHtmlTemplate } from './templates/appHtml.js';
+import { getAppHtmlTemplate } from './templates/appHtmlV2.js';
 import { getAppsscriptJsonTemplate } from './templates/appsscriptJson.js';
 import { PROJECT_TYPE_CHOICES, getProjectProfile } from './templates/projectProfiles.js';
+import { getRandomVisualTheme } from './templates/visualThemes.js';
 
 // ------------------------------------------------------------------
 // PATH DASAR
@@ -236,13 +237,13 @@ async function runClaspCreate(projectDir, displayName) {
 // ------------------------------------------------------------------
 // LANGKAH 5: Generate 3 file utama + manifest, menimpa stub dari clasp
 // ------------------------------------------------------------------
-async function generateProjectFiles(projectDir, displayName, profile) {
+async function generateProjectFiles(projectDir, displayName, profile, visualTheme) {
   logStep('Merakit kode monolith (Code.gs, Database.gs, app.html, appsscript.json)...');
 
   const files = {
     'Code.gs': getCodeGsTemplate(displayName, profile),
     'Database.gs': getDatabaseGsTemplate(displayName, profile),
-    'app.html': getAppHtmlTemplate(displayName, profile),
+    'app.html': getAppHtmlTemplate(displayName, profile, visualTheme),
     'appsscript.json': getAppsscriptJsonTemplate()
   };
 
@@ -378,6 +379,8 @@ async function main() {
   while (true) {
     try {
       const { displayName, folderName, profile } = await promptProjectName();
+      const visualTheme = getRandomVisualTheme();
+      logInfo(`Tema visual otomatis: ${visualTheme.name} (${visualTheme.layout}).`);
 
       logStep(`Menyiapkan folder proyek di: project/${folderName}`);
       const projectDir = await prepareProjectDirectory(folderName);
@@ -392,7 +395,7 @@ async function main() {
       }
 
       await runClaspCreate(projectDir, displayName);
-      await generateProjectFiles(projectDir, displayName, profile);
+      await generateProjectFiles(projectDir, displayName, profile, visualTheme);
       await runClaspPush(projectDir);
       const deploymentId = await runClaspDeploy(projectDir, displayName);
       await printSuccessMessage(projectDir, displayName, deploymentId);

@@ -13,6 +13,6 @@ function setupDatabase() { DB_initSchema(); return 'Database siap digunakan.'; }
 function apiLogin(username, password) { try { return AUTH_login(username, password); } catch (err) { return { success: false, message: err.message }; } }
 function apiRegister(payload) { try { return AUTH_register(payload); } catch (err) { return { success: false, message: err.message }; } }
 function apiSaveRecord(payload) { try { return DB_saveRecord(payload); } catch (err) { return { success: false, message: err.message }; } }
-function apiGetDashboard() { try { return { success: true, data: DB_getDashboard() }; } catch (err) { return { success: false, message: err.message }; } }
+function apiGetDashboard(moduleId, userRole) { try { return DB_getDashboard(moduleId, userRole); } catch (err) { return { success: false, message: err.message }; } }
 `;
 }
