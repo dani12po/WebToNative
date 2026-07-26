@@ -15,6 +15,15 @@ const VISUAL_THEMES = [
   { id: 'sky', name: 'Sky Travel', primary: '#0369a1', secondary: '#38bdf8', dark: '#082f49', soft: '#f0f9ff', background: '#f8fcff', layout: 'glass' }
 ];
 
-export function getRandomVisualTheme() {
-  return VISUAL_THEMES[randomInt(VISUAL_THEMES.length)];
+const THEME_BY_PROFILE = {
+  cashier: ['ruby', 'copper', 'sunset'], restaurant: ['ruby', 'copper', 'sunset'], coffee: ['copper', 'royal'], laundry: ['ocean', 'sky', 'rose'], salon: ['rose', 'ocean'], clinic: ['ocean', 'sky'], dental: ['ocean', 'rose'], pharmacy: ['ocean', 'slate'],
+  workshop: ['copper', 'slate'], carwash: ['sky', 'copper'], logistics: ['slate', 'sky'], warehouse: ['slate', 'midnight'], parking: ['slate', 'midnight'], security: ['midnight', 'slate'],
+  bimba: ['royal', 'sunset'], school: ['royal', 'sky'], course: ['royal', 'ocean'], attendance: ['sky', 'aurora'], finance: ['slate', 'midnight'], payroll: ['slate', 'midnight'], invoice: ['slate', 'royal'], legal: ['midnight', 'slate'], hr: ['aurora', 'slate'],
+  hotel: ['royal', 'midnight'], travel: ['sky', 'ocean'], event: ['royal', 'rose'], photography: ['midnight', 'rose'], realestate: ['slate', 'midnight'], donation: ['lime', 'royal'], posyandu: ['rose', 'ocean'], agriculture: ['forest', 'lime'], farm: ['forest', 'lime']
+};
+
+export function getRandomVisualTheme(profileId) {
+  const candidates = THEME_BY_PROFILE[profileId];
+  const pool = candidates ? VISUAL_THEMES.filter(theme => candidates.includes(theme.id)) : VISUAL_THEMES;
+  return pool[randomInt(pool.length)];
 }

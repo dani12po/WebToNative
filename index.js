@@ -420,7 +420,7 @@ async function main() {
   while (true) {
     try {
       const { displayName, folderName, profile } = await promptProjectName();
-      const visualTheme = getRandomVisualTheme();
+      const visualTheme = getRandomVisualTheme(profile.id);
       logInfo(`Tema visual otomatis: ${visualTheme.name} (${visualTheme.layout}).`);
 
       logStep(`Menyiapkan folder proyek di: project/${folderName}`);
