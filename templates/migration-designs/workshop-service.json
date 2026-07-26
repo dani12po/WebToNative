@@ -1,0 +1,10 @@
+{
+  "id": "workshop-service",
+  "name": "Workshop Service",
+  "match": ["bengkel", "servis", "service", "motor", "mobil", "sparepart", "mekanik"],
+  "layout": "topbar",
+  "landing": "centered",
+  "accent": "#14b8a6",
+  "accent2": "#3b82f6",
+  "description": "Workspace layanan teknis untuk tiket servis dan progres pekerjaan."
+}

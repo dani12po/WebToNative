@@ -11,6 +11,7 @@ CLI Node.js untuk membuat, mengunggah, dan men-deploy Web App Google Apps Script
 - UI responsif untuk desktop, tablet, dan handphone.
 - Layout dashboard dan halaman login yang bervariasi: topbar, split, reversed, sidebar, glass workspace, spotlight, editorial, showcase, dan minimal.
 - Tema AI opsional untuk menghasilkan palet, font, komposisi login, serta gaya dashboard yang sesuai nama dan jenis aplikasi.
+- AI App Preflight opsional untuk menilai apakah preset modul sudah cocok; bila belum, blueprint modul bisnis tervalidasi dibuat dan disimpan agar dapat dipakai ulang.
 - Pembuatan proyek Apps Script, `clasp push`, dan deployment Web App dalam satu alur CLI.
 
 ## Prasyarat
@@ -97,6 +98,8 @@ model=nama-model
 
 Saat opsi AI dipilih, terminal mencatat provider, model, palet, font, layout, gaya dashboard, dan gaya login. Respons AI hanya boleh memilih komponen yang telah divalidasi generator; AI tidak pernah memasukkan HTML atau JavaScript bebas ke aplikasi hasil generate.
 
+Saat membuat GAS Web App, AI App Preflight juga dapat menganalisis kebutuhan modul sebelum proyek dibuat. Preset lokal selalu diperiksa lebih dahulu; jika sudah sesuai, misalnya preset Laundry yang telah memiliki order, harga per kg, pelanggan, pembayaran, dan laporan, preset digunakan kembali. Jika belum cocok, AI menghasilkan blueprint modul terstruktur yang tervalidasi dan menyimpannya pada `templates/gas-app-blueprints/` untuk dipakai lagi atau di-commit ke Git. Blueprint tidak berisi kode bebas dan tidak membuat klaim integrasi pembayaran yang tidak tersedia.
+
 ## Pembayaran, tarif, dan QRIS
 
 Preset memiliki modul **Pembayaran**, **Pengaturan Harga**, dan **Metode Pembayaran** sesuai kebutuhan. Admin dapat mencatat nominal, status pembayaran, rekening/e-wallet, instruksi transfer, dan URL gambar QRIS resmi merchant.
@@ -114,6 +117,22 @@ Contoh fitur khusus:
 Status sesi lokal disimpan dalam `authsesion.json`. File ini hanya menyimpan status konfirmasi API dan metadata sesi; token OAuth tetap dikelola oleh `clasp` dan tidak disalin ke file tersebut.
 
 Selama `clasp` masih login, generator tidak akan meminta login OAuth atau aktivasi API berulang kali.
+
+## Migrasi ke Next.js
+
+Pilih **Migrasikan proyek GAS ke Next.js** dari menu utama untuk membaca `Code.gs` sebuah proyek di `project/` dan membuat scaffold Next.js pada `webmigrasi/<nama-proyek>/`.
+
+Hasil migrasi memindahkan konfigurasi aplikasi, modul, formulir, dan dashboard ke React/Next.js serta siap dijalankan dengan:
+
+```bash
+cd webmigrasi/<nama-proyek>
+npm install
+npm run dev
+```
+
+Jika `api.txt` dikonfigurasi, **AI Migration Preflight** berjalan sebelum file dibuat untuk menganalisis modul, arah UI, risiko, rencana backend, checklist tes, serta metadata SEO. Ringkasannya tampil di terminal dan disimpan pada `MIGRATION_AUDIT.md` di output Next.js. Saat migrasi, tools menjalankan `npm install` dan `npm run build` otomatis terlebih dahulu agar error Next.js terlihat sebelum deployment; error yang dikenali dapat diperbaiki otomatis lalu dibangun ulang, sedangkan AI memberi analisis terminal untuk error lain. Mode tersebut juga menawarkan deploy otomatis melalui `npx vercel --prod`; pilih `No` untuk deploy manual di kemudian hari. Data Google Sheets dan akun GAS tidak disalin otomatis. Scaffold memakai penyimpanan browser sebagai baseline yang langsung dapat di-deploy, lalu perlu dihubungkan ke database dan autentikasi server-side untuk penggunaan multi-user/produksi.
+
+Sebelum merakit UI, generator menilai template lokal dalam `templates/migration-designs/`. Jika ada kecocokan kuat, template itu digunakan ulang dan dipersonalisasi untuk copy landing, SEO, warna, serta layout. Jika belum ada template yang cocok, AI membuat **blueprint desain terstruktur** (bukan JavaScript/CSS bebas), generator memvalidasinya, lalu menyimpannya sebagai JSON di folder tersebut. Template yang tersimpan dapat direview dan di-commit ke Git untuk dipakai pada migrasi berikutnya.
 
 ## Struktur proyek
 
@@ -138,7 +157,7 @@ web-app-generator-GAS/
         └── appsscript.json
 ```
 
-`project/` adalah output generator dan tidak di-commit. Untuk mengubah aplikasi yang sudah dibuat, gunakan Apps Script Editor atau buat ulang proyek baru melalui generator.
+Folder `project/` dan `webmigrasi/` adalah output generator dan tidak di-commit. Untuk mengubah aplikasi yang sudah dibuat, gunakan Apps Script Editor atau buat ulang proyek baru melalui generator.
 
 ## Keamanan dan penggunaan produksi
 

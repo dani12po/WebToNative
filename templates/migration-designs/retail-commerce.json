@@ -1,0 +1,10 @@
+{
+  "id": "retail-commerce",
+  "name": "Retail Commerce",
+  "match": ["kasir", "toko", "retail", "penjualan", "produk", "stok", "pembayaran"],
+  "layout": "rail",
+  "landing": "editorial",
+  "accent": "#f97316",
+  "accent2": "#ec4899",
+  "description": "Etalase operasional ritel dengan fokus transaksi dan produk."
+}

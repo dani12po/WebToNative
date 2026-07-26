@@ -34,7 +34,10 @@ import { getAppHtmlTemplate } from './templates/appHtmlV3.js';
 import { getAppsscriptJsonTemplate } from './templates/appsscriptJson.js';
 import { PROJECT_TYPE_CHOICES, getProjectProfile } from './templates/projectProfiles.js';
 import { getRandomVisualTheme } from './templates/visualThemes.js';
-import { promptAndGenerateAiTheme } from './templates/aiTheme.js';
+import { promptAndGenerateAiTheme, analyzeMigrationBuildError, analyzeGasMigrationProject, createMigrationTemplateBlueprint, analyzeGasAppRequirements, reviewMigratedNextApp, requestMigrationAutoRepair, requestGasAutoRepair } from './templates/aiTheme.js';
+import { getNextMigrationFiles } from './templates/nextJsMigration.js';
+import { findBestMigrationTemplate, saveMigrationTemplate } from './templates/migrationTemplateLibrary.js';
+import { findGasBlueprint, saveGasBlueprint, applyGasBlueprint } from './templates/gasAppTemplateLibrary.js';
 
 // ------------------------------------------------------------------
 // PATH DASAR
@@ -46,6 +49,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const ROOT_DIR = __dirname;
 const PROJECT_CONTAINER_DIR = path.join(ROOT_DIR, 'project');
+const MIGRATION_CONTAINER_DIR = path.join(ROOT_DIR, 'webmigrasi');
 const GENERATOR_STATE_PATH = path.join(ROOT_DIR, 'authsesion.json');
 
 // ------------------------------------------------------------------
@@ -88,6 +92,19 @@ async function runInteractive(command, args, cwd) {
   });
 }
 
+async function runNextBuild(cwd) {
+  try {
+    const result = await execa('npm', ['run', 'build'], { cwd, all: true });
+    if (result.all) console.log(result.all);
+    return result;
+  } catch (err) {
+    const output = [err.all, err.stderr, err.stdout, err.shortMessage, err.message].filter(Boolean).join('\n');
+    if (output) console.log(output);
+    err.buildOutput = output;
+    throw err;
+  }
+}
+
 // ------------------------------------------------------------------
 // UTIL: cek apakah clasp CLI tersedia secara global
 // ------------------------------------------------------------------
@@ -128,6 +145,244 @@ async function getClaspSession() {
   }
 }
 
+async function promptOperation() {
+  return inquirer.prompt([{
+    type: 'list', name: 'operation', message: 'Pilih mode tools:', choices: [
+      { name: '1. WebApp New — buat dan deploy GAS Web App', value: 'generate' },
+      { name: '2. Migrasi Project — ubah proyek GAS menjadi Next.js', value: 'migrate' }
+    ]
+  }]);
+}
+
+async function readGasProjectProfile(projectDir) {
+  const codePath = path.join(projectDir, 'Code.gs');
+  const content = await fs.readFile(codePath, 'utf8');
+  const match = content.match(/const APP_CONFIG = ([\s\S]*?);\s*\n\s*function doGet/);
+  if (!match) throw new Error('APP_CONFIG tidak ditemukan pada Code.gs. Proyek GAS ini tidak memakai format generator yang didukung.');
+  const profile = JSON.parse(match[1]);
+  if (!profile?.modules?.length) throw new Error('Modul aplikasi tidak ditemukan pada proyek GAS.');
+  return profile;
+}
+
+async function runNextMigration() {
+  await fs.ensureDir(PROJECT_CONTAINER_DIR);
+  const entries = await fs.readdir(PROJECT_CONTAINER_DIR, { withFileTypes: true });
+  const choices = [];
+  for (const entry of entries) {
+    if (entry.isDirectory() && await fs.pathExists(path.join(PROJECT_CONTAINER_DIR, entry.name, 'Code.gs'))) {
+      choices.push({ name: entry.name, value: entry.name });
+    }
+  }
+  if (!choices.length) throw new Error('Tidak ada proyek GAS yang dapat dimigrasikan di folder project/.');
+  const { sourceName } = await inquirer.prompt([{ type: 'list', name: 'sourceName', message: 'Pilih proyek GAS yang akan dimigrasikan:', choices }]);
+  const sourceDir = path.join(PROJECT_CONTAINER_DIR, sourceName);
+  const profile = await readGasProjectProfile(sourceDir);
+  logStep('AI Migration Preflight — menganalisis modul, UI, backend, SEO, dan risiko...');
+  let migrationAnalysis = null;
+  try {
+    migrationAnalysis = await analyzeGasMigrationProject(profile.name || sourceName, profile);
+    if (migrationAnalysis) {
+      logSuccess(`AI Preflight: ${migrationAnalysis.summary || 'analisis selesai.'}`);
+      if (migrationAnalysis.uiDirection) logInfo(`UI: ${migrationAnalysis.uiDirection}`);
+      if (migrationAnalysis.backendPlan) logInfo(`Backend: ${migrationAnalysis.backendPlan}`);
+      if (migrationAnalysis.risks?.length) logInfo(`Risiko: ${migrationAnalysis.risks.join(' | ')}`);
+      logInfo(`SEO: ${migrationAnalysis.seoTitle || profile.name}`);
+    } else {
+      logInfo('AI Preflight dilewati: api.txt belum tersedia atau tidak valid. Menggunakan analisis template bawaan.');
+    }
+  } catch (err) {
+    logError(`AI Preflight gagal: ${err.message}`);
+    logInfo('Migrasi dilanjutkan dengan pemeriksaan template bawaan.');
+  }
+  logStep('Mencari template migrasi lokal yang paling sesuai...');
+  let templateMatch = await findBestMigrationTemplate(profile, migrationAnalysis);
+  let migrationTemplate = templateMatch.design;
+  if (templateMatch.matched) {
+    logSuccess(`Template lokal dipakai: ${migrationTemplate.name} (skor ${templateMatch.score}).`);
+  } else {
+    logInfo('Tidak ada template lokal yang cukup cocok. Meminta AI membuat blueprint template baru...');
+    try {
+      const blueprint = await createMigrationTemplateBlueprint(profile.name || sourceName, profile, migrationAnalysis);
+      if (blueprint) {
+        const saved = await saveMigrationTemplate(blueprint);
+        migrationTemplate = saved.design;
+        logSuccess(`Blueprint AI disimpan: ${path.relative(ROOT_DIR, saved.file)}.`);
+        logInfo(`Template baru: ${migrationTemplate.name} (${migrationTemplate.layout}/${migrationTemplate.landing}).`);
+      } else {
+        logInfo('AI template tidak tersedia; menggunakan Business Core yang aman.');
+      }
+    } catch (err) {
+      logError(`AI pembuat template gagal: ${err.message}`);
+      logInfo('Menggunakan Business Core yang aman agar migrasi tetap berjalan.');
+    }
+  }
+  const targetDir = path.join(MIGRATION_CONTAINER_DIR, sourceName);
+  if (await fs.pathExists(targetDir)) {
+    const { overwrite } = await inquirer.prompt([{ type: 'confirm', name: 'overwrite', message: `Folder webmigrasi/${sourceName} sudah ada. Timpa isinya?`, default: false }]);
+    if (!overwrite) throw new Error('Migrasi dibatalkan; folder tujuan tidak diubah.');
+    await fs.emptyDir(targetDir);
+  } else {
+    await fs.ensureDir(targetDir);
+  }
+  const files = getNextMigrationFiles({ projectName: profile.name || sourceName, profile, analysis: migrationAnalysis, designTemplate: migrationTemplate });
+  for (const [filename, content] of Object.entries(files)) {
+    const filePath = path.join(targetDir, filename);
+    await fs.ensureDir(path.dirname(filePath));
+    await fs.writeFile(filePath, content, 'utf8');
+  }
+  logSuccess(`Migrasi Next.js dibuat: ${targetDir}`);
+  logStep('Memasang dependensi Next.js dan memeriksa production build...');
+  let buildReady = true;
+  try {
+    await runInteractive('npm', ['install'], targetDir);
+    await runNextBuild(targetDir);
+    logSuccess('Next.js production build berhasil.');
+  } catch (err) {
+    buildReady = false;
+    logError('Build Next.js gagal. Periksa error di atas; source migrasi tetap tersimpan dan dapat diperbaiki.');
+    let buildError = [err.buildOutput, err.shortMessage, err.stderr, err.stdout, err.message].filter(Boolean).join('\n');
+    const knownRepair = await repairKnownMigrationError(targetDir, buildError);
+    if (knownRepair) {
+      logInfo(`Auto-repair diterapkan: ${knownRepair}. Menjalankan build ulang...`);
+      try {
+        await runNextBuild(targetDir);
+        buildReady = true;
+        logSuccess('Build berhasil setelah auto-repair.');
+      } catch (retryErr) {
+        logError('Build masih gagal setelah auto-repair.');
+        buildError = [retryErr.buildOutput, retryErr.shortMessage, retryErr.stderr, retryErr.stdout, retryErr.message].filter(Boolean).join('\n');
+      }
+    }
+    const analysis = await analyzeMigrationBuildError(buildError);
+    if (analysis) {
+      logInfo(`Analisis AI: ${analysis.summary || 'Tidak ada ringkasan.'}`);
+      if (analysis.cause) logInfo(`Penyebab: ${analysis.cause}`);
+      if (analysis.nextStep) logInfo(`Langkah berikut: ${analysis.nextStep}`);
+    } else {
+      logInfo('Analisis AI dilewati: api.txt belum tersedia atau tidak valid.');
+    }
+    if (!buildReady) buildReady = await repairMigrationBuildUntilPass(targetDir, buildError);
+  }
+  let qaReady = buildReady;
+  if (buildReady) {
+    logStep('AI Post-Build QA — memeriksa layout, formulir, menu, analitik, dan SEO...');
+    const reviewFiles = {};
+    for (const name of ['app/page.js', 'app/globals.css', 'app/layout.js', 'lib/app-config.js']) {
+      reviewFiles[name] = await fs.readFile(path.join(targetDir, name), 'utf8');
+    }
+    try {
+      const qa = await reviewMigratedNextApp(reviewFiles);
+      if (qa) {
+        await fs.writeFile(path.join(targetDir, 'MIGRATION_QA.md'), `# Post-Build QA\n\nStatus: **${qa.status}**\n\n${qa.summary}\n\n- Layout: ${qa.layout || 'n/a'}\n- Data entry: ${qa.dataEntry || 'n/a'}\n- Navigation: ${qa.navigation || 'n/a'}\n- SEO: ${qa.seo || 'n/a'}\n\n## Findings\n\n${qa.findings?.map(item => `- ${item}`).join('\n') || '- Tidak ada temuan.'}\n\n## Next step\n\n${qa.nextStep || 'Siap diuji dan dideploy.'}\n`, 'utf8');
+        logInfo(`AI QA: ${qa.summary || qa.status}`);
+        if (qa.findings?.length) logInfo(`Temuan QA: ${qa.findings.join(' | ')}`);
+        qaReady = qa.status === 'ready';
+        if (!qaReady) {
+          const repaired = await runAiMigrationRepairCycle(targetDir, `${qa.summary}\n${qa.findings?.join('\n') || ''}`, 'post-build QA');
+          if (repaired) {
+            try {
+              await runNextBuild(targetDir);
+              const refreshed = {};
+              for (const name of ['app/page.js', 'app/globals.css', 'app/layout.js', 'lib/app-config.js']) refreshed[name] = await fs.readFile(path.join(targetDir, name), 'utf8');
+              const finalQa = await reviewMigratedNextApp(refreshed);
+              qaReady = finalQa?.status === 'ready';
+              logInfo(`QA setelah auto-repair: ${finalQa?.summary || (qaReady ? 'siap' : 'masih perlu review')}`);
+            } catch (repairErr) {
+              logError('Auto-repair QA tidak lolos build ulang.');
+            }
+          }
+        }
+      } else {
+        logInfo('AI Post-Build QA dilewati: api.txt belum tersedia atau tidak valid. Static build sudah berhasil.');
+      }
+    } catch (err) {
+      qaReady = false;
+      logError(`AI Post-Build QA gagal: ${err.message}`);
+    }
+  }
+  if (buildReady && qaReady) logSuccess('MIGRATION COMPLETE — build dan QA selesai, aplikasi siap diuji/deploy.');
+  if (buildReady && !qaReady) logError('MIGRATION NEEDS REVIEW — build berhasil, tetapi QA meminta perbaikan sebelum deployment.');
+  if (!buildReady) {
+    logError('MIGRATION FAILED — build belum lolos; aplikasi tidak dinyatakan selesai dan deployment diblokir.');
+    logInfo('Perbaiki error yang tersisa, lalu jalankan migrasi ulang agar generator membuat output bersih dari awal.');
+    return;
+  }
+  if (!qaReady) {
+    logError('MIGRATION NEEDS REVIEW — deployment diblokir sampai QA menyatakan siap.');
+    return;
+  }
+  logInfo('Jalankan npm run dev untuk menguji aplikasi hasil migrasi secara lokal.');
+  const { deploy } = await inquirer.prompt([{ type: 'confirm', name: 'deploy', message: 'Deploy ke Vercel sekarang dengan npx vercel --prod?', default: false }]);
+  if (deploy) {
+    logStep('Menjalankan deployment Vercel...');
+    await runInteractive('npx', ['vercel', '--prod'], targetDir);
+    logSuccess('Perintah deployment Vercel selesai.');
+  } else if (!deploy) {
+    logInfo('Deploy manual: cd webmigrasi/' + sourceName + ' && npm install && npx vercel --prod');
+  }
+}
+
+async function repairKnownMigrationError(targetDir, buildError) {
+  if (!/Invalid currency code\s*:?\s*ID\b/i.test(buildError || '')) return null;
+  const pagePath = path.join(targetDir, 'app', 'page.js');
+  if (!await fs.pathExists(pagePath)) return null;
+  const source = await fs.readFile(pagePath, 'utf8');
+  if (!source.includes("currency:'ID'")) return null;
+  await fs.writeFile(pagePath, source.replaceAll("currency:'ID'", "currency:'IDR'"), 'utf8');
+  return 'kode mata uang ID diganti menjadi IDR';
+}
+
+async function repairMigrationBuildUntilPass(targetDir, initialIssue) {
+  let issue = initialIssue;
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    logInfo(`AI auto-repair build percobaan ${attempt}/3.`);
+    const repaired = await runAiMigrationRepairCycle(targetDir, issue, `build ${attempt}/3`);
+    if (!repaired) return false;
+    try {
+      await runNextBuild(targetDir);
+      logSuccess(`Build berhasil setelah AI auto-repair percobaan ${attempt}.`);
+      return true;
+    } catch (err) {
+      issue = [err.buildOutput, err.shortMessage, err.stderr, err.stdout, err.message].filter(Boolean).join('\n');
+      logError(`Build masih gagal setelah patch AI percobaan ${attempt}.`);
+    }
+  }
+  logError('Batas aman 3 percobaan AI auto-repair tercapai; migration tidak dinyatakan selesai.');
+  return false;
+}
+
+async function runAiMigrationRepairCycle(targetDir, issue, phase) {
+  const files = {};
+  for (const name of ['app/page.js', 'app/globals.css', 'app/layout.js']) files[name] = await fs.readFile(path.join(targetDir, name), 'utf8');
+  try {
+    logStep(`AI Auto-Repair (${phase}) — membuat patch aman...`);
+    const proposal = await requestMigrationAutoRepair(issue, files);
+    if (!proposal?.edits?.length) {
+      logInfo('AI tidak memberikan patch aman untuk issue ini.');
+      return false;
+    }
+    const allowed = new Set(Object.keys(files));
+    let applied = 0;
+    for (const edit of proposal.edits) {
+      if (!allowed.has(edit.file) || typeof edit.find !== 'string' || typeof edit.replace !== 'string' || !edit.find || edit.find.length > 6000 || edit.replace.length > 10000) continue;
+      const source = files[edit.file];
+      if (!source.includes(edit.find)) continue;
+      files[edit.file] = source.replace(edit.find, edit.replace);
+      applied++;
+    }
+    if (!applied) {
+      logInfo('Patch AI ditolak karena tidak cocok dengan source hasil migrasi.');
+      return false;
+    }
+    for (const [name, content] of Object.entries(files)) await fs.writeFile(path.join(targetDir, name), content, 'utf8');
+    logSuccess(`AI auto-repair menerapkan ${applied} patch: ${proposal.summary || 'patch aman diterapkan.'}`);
+    return true;
+  } catch (err) {
+    logError(`AI auto-repair gagal: ${err.message}`);
+    return false;
+  }
+}
+
 // ------------------------------------------------------------------
 // LANGKAH 1: Input nama proyek & siapkan struktur folder
 // ------------------------------------------------------------------
@@ -163,6 +418,46 @@ async function promptProjectName() {
     .replace(/[^a-z0-9-_]/g, '');
 
   return { displayName: projectName, folderName: folderSafeName, profile: getProjectProfile(projectType) };
+}
+
+async function resolveGasAppTemplate(displayName, profile) {
+  const existing = await findGasBlueprint(displayName, profile);
+  if (existing) {
+    logSuccess(`Blueprint aplikasi lokal dipakai: ${existing.blueprint.name} (skor ${existing.score}).`);
+    return applyGasBlueprint(profile, existing.blueprint);
+  }
+  const { enabled } = await inquirer.prompt([{
+    type: 'confirm',
+    name: 'enabled',
+    message: 'Gunakan AI untuk menganalisis kebutuhan modul dan template aplikasi?',
+    default: true
+  }]);
+  if (!enabled) {
+    logInfo(`Menggunakan template preset: ${profile.name}.`);
+    return profile;
+  }
+  logStep('AI App Preflight â€” menganalisis kebutuhan bisnis, data, tarif, pembayaran, dan laporan...');
+  try {
+    const proposal = await analyzeGasAppRequirements(displayName, profile);
+    if (!proposal) {
+      logInfo('AI App Preflight dilewati: api.txt belum tersedia atau tidak valid. Menggunakan template preset.');
+      return profile;
+    }
+    if (proposal.decision === 'use_preset') {
+      logSuccess(`Analisis AI: ${proposal.summary || `preset ${profile.name} sudah mencakup kebutuhan inti.`}`);
+      logInfo(`Template preset dipertahankan: ${profile.name}.`);
+      return profile;
+    }
+    const saved = await saveGasBlueprint(proposal);
+    logSuccess(`Analisis AI: ${proposal.summary || 'Blueprint kebutuhan aplikasi selesai.'}`);
+    logInfo(`Blueprint aplikasi disimpan: ${path.relative(ROOT_DIR, saved.file)}.`);
+    logInfo(`Modul: ${saved.blueprint.modules.map(module => module.name).join(' | ')}`);
+    return applyGasBlueprint(profile, saved.blueprint);
+  } catch (err) {
+    logError(`AI App Preflight gagal: ${err.message}`);
+    logInfo(`Menggunakan template preset aman: ${profile.name}.`);
+    return profile;
+  }
 }
 
 async function prepareProjectDirectory(folderName) {
@@ -311,6 +606,53 @@ async function runClaspPush(projectDir) {
   }
 }
 
+async function runGasPushWithAiRepair(projectDir) {
+  try {
+    await runClaspPush(projectDir);
+    return;
+  } catch (firstError) {
+    let issue = firstError.message;
+    const allowed = ['Code.gs', 'Database.gs', 'app.html', 'appsscript.json'];
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      const files = {};
+      for (const name of allowed) files[name] = await fs.readFile(path.join(projectDir, name), 'utf8');
+      logStep(`AI Auto-Repair GAS (${attempt}/3) — menganalisis kegagalan push...`);
+      let proposal;
+      try {
+        proposal = await requestGasAutoRepair(issue, files);
+      } catch (err) {
+        logError(`AI Auto-Repair GAS gagal: ${err.message}`);
+        break;
+      }
+      if (!proposal?.edits?.length) {
+        logInfo('AI tidak memberikan patch GAS yang aman untuk error ini.');
+        break;
+      }
+      let applied = 0;
+      for (const edit of proposal.edits) {
+        if (!allowed.includes(edit.file) || typeof edit.find !== 'string' || typeof edit.replace !== 'string' || !edit.find || edit.find.length > 7000 || edit.replace.length > 12000 || !files[edit.file].includes(edit.find)) continue;
+        files[edit.file] = files[edit.file].replace(edit.find, edit.replace);
+        applied++;
+      }
+      if (!applied) {
+        logInfo('Patch GAS ditolak karena tidak sesuai dengan source lokal.');
+        break;
+      }
+      for (const [name, content] of Object.entries(files)) await fs.writeFile(path.join(projectDir, name), content, 'utf8');
+      logSuccess(`AI Auto-Repair GAS menerapkan ${applied} patch: ${proposal.summary || 'patch aman diterapkan.'}`);
+      try {
+        await runClaspPush(projectDir);
+        logSuccess(`Push GAS berhasil setelah AI Auto-Repair percobaan ${attempt}.`);
+        return;
+      } catch (err) {
+        issue = err.message;
+        logError(`Push GAS masih gagal setelah patch AI percobaan ${attempt}.`);
+      }
+    }
+    throw new Error('Push GAS gagal setelah AI Auto-Repair. Deployment tidak dijalankan. Periksa error terakhir di terminal.');
+  }
+}
+
 // ------------------------------------------------------------------
 // LANGKAH 7: clasp deploy — membuat deployment Web App & mengambil
 // Deployment ID dari output terminal untuk menyusun link /exec.
@@ -404,26 +746,39 @@ async function printSuccessMessage(projectDir, displayName, deploymentId) {
 // ------------------------------------------------------------------
 async function main() {
   printBanner();
+  let state = null;
+  let isAuthenticated = false;
+  let gasReady = false;
 
-  const claspOk = await ensureClaspAvailable();
-  if (!claspOk) {
-    process.exitCode = 1;
-    return;
-  }
-
-  const state = await loadGeneratorState();
-  const currentSession = await getClaspSession();
-  let isAuthenticated = Boolean(currentSession);
-  if (currentSession) {
-    state.claspSession = { email: currentSession.email, checkedAt: new Date().toISOString() };
-    await saveGeneratorState(state);
-    logInfo(`Menggunakan sesi clasp tersimpan: ${currentSession.email}.`);
+  async function initializeGas() {
+    if (gasReady) return true;
+    if (!await ensureClaspAvailable()) return false;
+    state = await loadGeneratorState();
+    const currentSession = await getClaspSession();
+    isAuthenticated = Boolean(currentSession);
+    if (currentSession) {
+      state.claspSession = { email: currentSession.email, checkedAt: new Date().toISOString() };
+      await saveGeneratorState(state);
+      logInfo(`Menggunakan sesi clasp tersimpan: ${currentSession.email}.`);
+    }
+    gasReady = true;
+    return true;
   }
 
   while (true) {
     try {
-      const { displayName, folderName, profile } = await promptProjectName();
+      const { operation } = await promptOperation();
+      if (operation === 'migrate') {
+        await runNextMigration();
+        continue;
+      }
+      if (!await initializeGas()) continue;
+      const projectInput = await promptProjectName();
+      const { displayName, folderName } = projectInput;
+      let profile = projectInput.profile;
       logInfo(`Profil aplikasi terpilih: ${profile.name}.`);
+      profile = await resolveGasAppTemplate(displayName, profile);
+      logInfo(`Template aplikasi aktif: ${profile.name}${profile.aiBlueprint ? ` (AI blueprint: ${profile.aiBlueprint})` : ''}.`);
       const defaultTheme = getRandomVisualTheme(profile.id);
       let visualTheme = defaultTheme;
       try {
@@ -461,7 +816,7 @@ async function main() {
 
       await runClaspCreate(projectDir, displayName);
       await generateProjectFiles(projectDir, displayName, profile, visualTheme);
-      await runClaspPush(projectDir);
+      await runGasPushWithAiRepair(projectDir);
       const deploymentId = await runClaspDeploy(projectDir, displayName);
       await printSuccessMessage(projectDir, displayName, deploymentId);
     } catch (err) {

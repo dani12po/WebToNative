@@ -1,0 +1,10 @@
+{
+  "id": "booking-experience",
+  "name": "Booking Experience",
+  "match": ["booking", "reservasi", "jadwal", "antrian", "konsultasi", "appointment"],
+  "layout": "topbar",
+  "landing": "split",
+  "accent": "#8b5cf6",
+  "accent2": "#06b6d4",
+  "description": "Pengalaman pemesanan dan penjadwalan yang tenang serta terstruktur."
+}
