@@ -387,6 +387,8 @@ async function printSuccessMessage(projectDir, displayName, deploymentId) {
   console.log('');
   console.log(chalk.gray('Catatan penting:'));
   console.log(chalk.gray('  • Database dan sheet dibuat otomatis saat aplikasi pertama kali digunakan.'));
+  console.log(chalk.yellow('  • Akun Admin awal: username Admin  |  password Admin123'));
+  console.log(chalk.gray('    Segera ubah password awal melalui menu Akun Saya setelah berhasil masuk.'));
   console.log(chalk.gray('  • Kunjungan pertama ke link Web App mungkin meminta layar izin/otorisasi'));
   console.log(chalk.gray('    Google — ini normal untuk deployment baru.'));
   console.log('');
@@ -421,6 +423,7 @@ async function main() {
   while (true) {
     try {
       const { displayName, folderName, profile } = await promptProjectName();
+      logInfo(`Profil aplikasi terpilih: ${profile.name}.`);
       const defaultTheme = getRandomVisualTheme(profile.id);
       let visualTheme = defaultTheme;
       try {

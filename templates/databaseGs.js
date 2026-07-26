@@ -14,18 +14,22 @@ function DB_getSpreadsheet() {
 function DB_sheetName_(module) { return 'Data - ' + module.name; }
 function DB_module_(moduleId) { for (let i = 0; i < APP_MODULES.length; i++) if (APP_MODULES[i].id === moduleId) return APP_MODULES[i]; throw new Error('Modul tidak ditemukan.'); }
 function DB_initSchema() {
-  const ss = DB_getSpreadsheet();
-  const users = DB_ensureSheet_(ss, USER_SHEET, ['UserId', 'Username', 'PasswordHash', 'FullName', 'Role', 'CreatedAt']);
-  APP_MODULES.forEach(function(module) { DB_ensureSheet_(ss, DB_sheetName_(module), ['Id'].concat(module.fields.map(function(f) { return f.label; })).concat(['Dibuat pada', 'Dibuat oleh'])); });
-  if (users.getLastRow() === 1) users.appendRow([DB_id_(), 'Admin', DB_hash_('Admin123'), 'Administrator', 'admin', new Date()]);
-  const sheet1 = ss.getSheetByName('Sheet1'); if (sheet1 && ss.getSheets().length > 1) ss.deleteSheet(sheet1);
+  const lock = LockService.getScriptLock(); lock.waitLock(30000);
+  try {
+    const ss = DB_getSpreadsheet();
+    const users = DB_ensureSheet_(ss, USER_SHEET, ['UserId', 'Username', 'PasswordHash', 'FullName', 'Role', 'CreatedAt']);
+    APP_MODULES.forEach(function(module) { DB_ensureSheet_(ss, DB_sheetName_(module), ['Id'].concat(module.fields.map(function(f) { return f.label; })).concat(['Dibuat pada', 'Dibuat oleh'])); });
+    DB_ensureAdmin_(users);
+    const sheet1 = ss.getSheetByName('Sheet1'); if (sheet1 && ss.getSheets().length > 1) ss.deleteSheet(sheet1);
+  } finally { lock.releaseLock(); }
 }
 function DB_ensureSheet_(ss, name, headers) { let sh = ss.getSheetByName(name); if (!sh) sh = ss.insertSheet(name); if (sh.getLastRow() === 0) { sh.appendRow(headers); sh.setFrozenRows(1); sh.getRange(1, 1, 1, headers.length).setFontWeight('bold'); } return sh; }
 function DB_sheet_(name) { const ss = DB_getSpreadsheet(); let sh = ss.getSheetByName(name); if (!sh) { DB_initSchema(); sh = DB_getSpreadsheet().getSheetByName(name); } return sh; }
 function DB_id_() { return Utilities.getUuid().split('-')[0].toUpperCase(); }
 function DB_hash_(password) { return Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, password, Utilities.Charset.UTF_8).map(function(b) { return ('0' + (b < 0 ? b + 256 : b).toString(16)).slice(-2); }).join(''); }
-function AUTH_register(p) { const sh = DB_sheet_(USER_SHEET), rows = sh.getDataRange().getValues(); for (let i = 1; i < rows.length; i++) if (rows[i][1] === p.username) return { success:false, message:'Username sudah digunakan.' }; sh.appendRow([DB_id_(), p.username, DB_hash_(p.password), p.fullName || p.username, 'member', new Date()]); return { success:true, message:'Akun berhasil dibuat.' }; }
-function AUTH_login(username, password) { const rows = DB_sheet_(USER_SHEET).getDataRange().getValues(), hash = DB_hash_(password); for (let i = 1; i < rows.length; i++) if (rows[i][1] === username && rows[i][2] === hash) return { success:true, user:{ id:rows[i][0], name:rows[i][3], username:rows[i][1], role:rows[i][4] } }; return { success:false, message:'Username atau password salah.' }; }
+function DB_ensureAdmin_(users) { const rows = users.getDataRange().getValues(); for (let i = 1; i < rows.length; i++) if (String(rows[i][1]) === 'Admin') return; users.appendRow([DB_id_(), 'Admin', DB_hash_('Admin123'), 'Administrator', 'admin', new Date()]); }
+function AUTH_register(p) { const sh = DB_sheet_(USER_SHEET); DB_ensureAdmin_(sh); const rows = sh.getDataRange().getValues(); for (let i = 1; i < rows.length; i++) if (rows[i][1] === p.username) return { success:false, message:'Username sudah digunakan.' }; sh.appendRow([DB_id_(), p.username, DB_hash_(p.password), p.fullName || p.username, 'member', new Date()]); return { success:true, message:'Akun berhasil dibuat.' }; }
+function AUTH_login(username, password) { const sh = DB_sheet_(USER_SHEET); DB_ensureAdmin_(sh); const rows = sh.getDataRange().getValues(), hash = DB_hash_(password); for (let i = 1; i < rows.length; i++) if (rows[i][1] === username && rows[i][2] === hash) return { success:true, user:{ id:rows[i][0], name:rows[i][3], username:rows[i][1], role:rows[i][4] } }; return { success:false, message:'Username atau password salah. Gunakan huruf besar yang tepat pada akun default: Admin / Admin123.' }; }
 function AUTH_admin_(username, password) { const login = AUTH_login(username, password); if (!login.success || login.user.role !== 'admin') throw new Error('Konfirmasi password Admin diperlukan.'); return login.user; }
 function DB_updateMyAccount(payload) { const username = String(payload.username || '').trim(), currentPassword = String(payload.currentPassword || ''), fullName = String(payload.fullName || '').trim(), newPassword = String(payload.newPassword || ''); if (!username || !currentPassword) throw new Error('Masukkan password saat ini untuk menyimpan perubahan.'); if (!fullName) throw new Error('Nama lengkap wajib diisi.'); if (newPassword && newPassword.length < 8) throw new Error('Password baru minimal 8 karakter.'); const sh = DB_sheet_(USER_SHEET), rows = sh.getDataRange().getValues(), hash = DB_hash_(currentPassword); for (let i = 1; i < rows.length; i++) { if (rows[i][1] === username && rows[i][2] === hash) { sh.getRange(i + 1, 4).setValue(fullName); if (newPassword) sh.getRange(i + 1, 3).setValue(DB_hash_(newPassword)); return { success:true, message:'Informasi akun berhasil diperbarui.', user:{ id:rows[i][0], username:username, name:fullName, role:rows[i][4] } }; } } return { success:false, message:'Password saat ini tidak sesuai.' }; }
 function DB_getUsers(adminUsername, adminPassword) { AUTH_admin_(adminUsername, adminPassword); const rows = DB_sheet_(USER_SHEET).getDataRange().getDisplayValues(); rows.shift(); return { success:true, data:rows.map(function(row) { return { id:row[0], username:row[1], fullName:row[3], role:row[4], createdAt:row[5] }; }) }; }
