@@ -1,129 +1,153 @@
 # GAS Web App Generator
 
-CLI Node.js untuk membuat dan deploy Google Apps Script Web App dengan dashboard SaaS modular, Google Sheets sebagai database, serta tema visual responsif.
+CLI Node.js untuk membuat, mengunggah, dan men-deploy Web App Google Apps Script (GAS) dengan dashboard SaaS modular. Setiap proyek memakai Google Sheets sebagai penyimpanan data dan dapat dikembangkan lebih lanjut dari Apps Script Editor.
 
-## Fitur utama
+## Yang dihasilkan
 
-- 54 preset aplikasi, termasuk Kasir, Laundry, Bengkel, Booking, BIMBA, Analisis Keuangan, Inventaris, Sekolah, Klinik, Restoran, E-Commerce, HR, dan lainnya.
-- Dashboard modular: data utama, aktivitas, laporan, pembayaran, dan pengaturan harga.
-- Role awal Admin dan User; menu Admin hanya ditampilkan untuk Admin.
-- 12 tema visual dengan kombinasi warna, font, serta lima variasi layout dashboard.
-- Responsif untuk desktop, tablet, dan handphone.
-- Login, registrasi, logout, tabel data, dan notifikasi aplikasi.
-- Database Google Sheets dibuat otomatis saat aplikasi pertama digunakan.
-- Pembuatan Apps Script, push source, dan deployment dilakukan dari CLI.
+- 54+ preset aplikasi: kasir, toko fashion, laundry, bengkel, booking, sekolah, BIMBA, klinik, inventaris, keuangan, HR, restoran, dan lainnya.
+- Login, registrasi, logout, role Admin/User, serta menu **Akun Saya**.
+- Panel Admin untuk pengaturan harga, metode pembayaran, laporan, dan manajemen pengguna.
+- Database Google Sheets yang dibuat otomatis saat aplikasi pertama digunakan.
+- UI responsif untuk desktop, tablet, dan handphone.
+- Layout dashboard dan halaman login yang bervariasi: topbar, split, reversed, sidebar, glass workspace, spotlight, editorial, showcase, dan minimal.
+- Tema AI opsional untuk menghasilkan palet, font, komposisi login, serta gaya dashboard yang sesuai nama dan jenis aplikasi.
+- Pembuatan proyek Apps Script, `clasp push`, dan deployment Web App dalam satu alur CLI.
 
 ## Prasyarat
 
 1. Node.js 18 atau lebih baru.
-2. `clasp` terpasang secara global:
+2. Akun Google yang memiliki akses Google Drive dan Apps Script.
+3. Google Apps Script API aktif di [Apps Script settings](https://script.google.com/home/usersettings).
+4. `clasp` terpasang global:
 
    ```bash
    npm install -g @google/clasp
    ```
 
-3. Akun Google dengan akses Google Drive dan Apps Script.
-
 ## Instalasi
 
 ```bash
-cd gas-webapp-generator
+git clone https://github.com/hydracore-digitech/web-app-generator-GAS.git
+cd web-app-generator-GAS
 npm install
 ```
 
-## Menjalankan generator
+## Membuat Web App
 
 ```bash
 npm start
 ```
 
-Pilih nama proyek dan template aplikasi. Generator akan membuat folder pada `project/<nama-proyek>`, membuat Apps Script standalone, mengirim source, lalu membuat deployment Web App.
+Kemudian:
 
-Setelah proyek selesai, tekan Enter untuk kembali ke menu utama dan membuat proyek lain dalam sesi yang sama.
+1. Masukkan nama proyek.
+2. Pilih preset aplikasi.
+3. Pilih apakah tema AI akan digunakan.
+4. Generator membuat folder `project/<nama-proyek>`, proyek Apps Script standalone, file sumber, push, dan deployment.
+5. Salin URL Web App yang tampil di terminal.
 
-## Sesi Google dan API
+Setelah deployment, tekan Enter untuk kembali ke menu utama. Sesi `clasp` dipakai ulang sehingga tidak perlu login Google setiap membuat proyek baru.
 
-Pada run pertama, generator akan memandu aktivasi Apps Script API dan login `clasp`.
+> Generator menampilkan `Profil aplikasi terpilih` sebelum proses dibuat. Periksa baris ini untuk memastikan preset yang dipilih sudah benar.
 
-Status lokal disimpan sebagai `authsesion.json` di direktori generator. File tersebut menyimpan konfirmasi API, email sesi, dan waktu pemeriksaan. Token OAuth tidak disalin ke file ini; token tetap dikelola `clasp`.
+## Akun Admin awal
 
-Selama sesi `clasp` masih aktif, run berikutnya tidak membuka OAuth atau meminta konfirmasi API lagi. File `authsesion.json` diabaikan Git agar tidak ikut dipublikasikan.
+Pada penggunaan pertama, database dan akun awal dibuat otomatis:
 
-## Tema visual dengan AI (opsional)
+| Field | Nilai |
+| --- | --- |
+| Username | `Admin` |
+| Password | `Admin123` |
+| Role | `admin` |
 
-Untuk meminta AI membuat warna, font, dan layout berdasarkan judul serta jenis aplikasi, salin `api.txt.example` menjadi `api.txt`, lalu isi konfigurasi berikut:
+Segera masuk lalu ubah password melalui menu **Akun Saya**. Jika sheet pengguna belum memiliki akun `Admin`, generator juga memastikan akun awal tersebut dibuat saat proses login.
+
+## Fitur akun dan akses
+
+Semua pengguna dapat membuka **Akun Saya** untuk memperbarui nama dan password sendiri. Perubahan password meminta password saat ini.
+
+Admin dapat membuka panel **Manajemen pengguna** dari halaman yang sama untuk melihat pengguna, memperbarui nama/role, dan mereset password. Aksi administratif meminta password Admin sebagai konfirmasi.
+
+## Tema AI opsional
+
+Buat file `api.txt` di root generator. File ini bersifat lokal dan sudah diabaikan Git.
 
 ```text
-provider=openai
+provider=nvidia
 api_key=ISI_API_KEY_ANDA
-model=ISI_MODEL_ANDA
+model=poolside/laguna-xs-2.1
 ```
 
-Provider yang didukung: `openai`, `groq`, `nvidia`, `openrouter`, atau `custom` dengan `endpoint` HTTPS kompatibel Chat Completions. File `api.txt` tidak pernah di-commit dan tidak disalin ke proyek hasil generate. Saat generator bertanya apakah tema AI akan digunakan, pilih `Yes` untuk memakai konfigurasi tersebut.
+Provider yang didukung:
 
-## Akun awal aplikasi
+- `openai`
+- `groq`
+- `nvidia`
+- `openrouter`
+- `custom` untuk endpoint HTTPS yang kompatibel dengan Chat Completions
 
-Saat database proyek baru pertama dibuat, akun berikut tersedia:
-
-- Username: `Admin`
-- Password: `Admin123`
-- Role: `admin`
-
-Segera ubah password awal sebelum aplikasi digunakan secara nyata.
-
-## Pembayaran dan harga
-
-Setiap preset mendapatkan modul Pembayaran dan Pengaturan Harga untuk Admin, kecuali bila preset sudah memiliki modul versi khusus.
-
-Metode pembayaran yang dapat dicatat: Tunai, QRIS, Transfer, dan Kartu. QRIS pada generator adalah pencatatan metode dan status pembayaran. QR dinamis atau konfirmasi pembayaran otomatis memerlukan integrasi payment gateway resmi beserta kredensial pengguna, misalnya Midtrans atau Xendit.
-
-Preset Laundry memiliki modul tambahan untuk Order, Layanan & Harga, Pelanggan, Pembayaran, dan Laporan. Total tagihan disimpan dengan perhitungan server:
+Konfigurasi `custom` memerlukan `endpoint` tambahan:
 
 ```text
-(berat × harga per kg) − diskon
+provider=custom
+endpoint=https://contoh.com/v1/chat/completions
+api_key=ISI_API_KEY_ANDA
+model=nama-model
 ```
 
-Preset Bengkel memiliki Tiket Servis, Sparepart, Teknisi, Pelanggan, Pembayaran, dan Laporan Bengkel.
+Saat opsi AI dipilih, terminal mencatat provider, model, palet, font, layout, gaya dashboard, dan gaya login. Respons AI hanya boleh memilih komponen yang telah divalidasi generator; AI tidak pernah memasukkan HTML atau JavaScript bebas ke aplikasi hasil generate.
 
-## Preset dan tampilan
+## Pembayaran, tarif, dan QRIS
 
-Setiap proyek memilih tema visual secara otomatis. Tema dapat mengubah palet warna, font, halaman login, dan struktur dashboard seperti sidebar kiri, navigasi atas, sidebar kanan, glass workspace, atau layout compact.
+Preset memiliki modul **Pembayaran**, **Pengaturan Harga**, dan **Metode Pembayaran** sesuai kebutuhan. Admin dapat mencatat nominal, status pembayaran, rekening/e-wallet, instruksi transfer, dan URL gambar QRIS resmi merchant.
 
-Semua dashboard tetap mempertahankan form yang bisa digunakan, penyimpanan data Google Sheets, serta tabel responsif. Pada layar kecil, menu berubah menjadi navigasi horizontal dan tabel bisa digeser tanpa memecahkan layout.
+Generator ini tidak membuat QRIS interoperable dari nomor rekening atau e-wallet dan tidak melakukan konfirmasi pembayaran otomatis. Untuk QRIS dinamis, verifikasi mutasi otomatis, atau pembayaran produksi, gunakan penyedia pembayaran resmi serta kredensial merchant yang sah.
+
+Contoh fitur khusus:
+
+- **Laundry**: order, layanan & harga, pelanggan, pembayaran, serta laporan. Total dihitung di server dengan rumus `(berat × harga per kg) − diskon`.
+- **Bengkel**: tiket servis, sparepart, teknisi, pelanggan, pembayaran, dan laporan bengkel.
+- **Kasir/Retail**: transaksi, produk, stok, pembayaran, dan laporan.
+
+## Sesi Google
+
+Status sesi lokal disimpan dalam `authsesion.json`. File ini hanya menyimpan status konfirmasi API dan metadata sesi; token OAuth tetap dikelola oleh `clasp` dan tidak disalin ke file tersebut.
+
+Selama `clasp` masih login, generator tidak akan meminta login OAuth atau aktivasi API berulang kali.
 
 ## Struktur proyek
 
 ```text
-gas-webapp-generator/
+web-app-generator-GAS/
 ├── index.js
 ├── package.json
 ├── templates/
+│   ├── aiTheme.js
 │   ├── appHtmlV2.js
 │   ├── appHtmlV3.js
 │   ├── codeGs.js
 │   ├── databaseGs.js
 │   ├── projectProfiles.js
-│   ├── visualThemes.js
-│   └── appsscriptJson.js
+│   └── visualThemes.js
 └── project/
     └── <nama-proyek>/
+        ├── .clasp.json
         ├── Code.gs
         ├── Database.gs
         ├── app.html
-        ├── appsscript.json
-        └── .clasp.json
+        └── appsscript.json
 ```
 
-## File yang dihasilkan
+`project/` adalah output generator dan tidak di-commit. Untuk mengubah aplikasi yang sudah dibuat, gunakan Apps Script Editor atau buat ulang proyek baru melalui generator.
 
-- `Code.gs`: entry point Web App dan API untuk frontend.
-- `Database.gs`: schema Google Sheets, autentikasi, modul data, pembayaran, dan perhitungan khusus.
-- `app.html`: halaman login dan dashboard SPA responsif.
-- `appsscript.json`: manifest Apps Script.
+## Keamanan dan penggunaan produksi
 
-## Catatan keamanan dan operasional
+- Jangan commit atau bagikan `api.txt`, `authsesion.json`, atau kredensial `clasp`.
+- Ganti password Admin awal sebelum aplikasi digunakan.
+- Uji dengan data non-produksi terlebih dahulu.
+- Buat backup Google Sheet secara berkala.
+- Untuk data sensitif, transaksi riil, atau kebutuhan kepatuhan khusus, lakukan audit keamanan dan pengembangan tambahan sebelum dipakai produksi.
 
-- Jangan membagikan file kredensial `clasp` atau file sesi lokal.
-- Gunakan password Admin yang baru sebelum aplikasi dipakai pelanggan.
-- Validasi dan pembatasan akses perlu disesuaikan lagi jika aplikasi menangani data sensitif atau transaksi nyata.
-- Uji deployment dengan akun dan data non-produksi sebelum digunakan pelanggan.
+## Lisensi
+
+Periksa lisensi repository atau hubungi pemilik repository untuk penggunaan komersial dan distribusi.
