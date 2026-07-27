@@ -168,7 +168,11 @@ async function installAndroidCommandLineTools(sdkRoot) {
 
 async function runSdkManager(sdkManager, sdkRoot, javaHome, args, acceptLicenses = false) {
   const env = { ...process.env, JAVA_HOME: javaHome, ANDROID_HOME: sdkRoot, ANDROID_SDK_ROOT: sdkRoot, Path: `${path.join(javaHome, 'bin')};${process.env.Path || process.env.PATH || ''}` };
-  const result = await execa(sdkManager, [`--sdk_root=${sdkRoot}`, ...args], { env, all: true, input: acceptLicenses ? 'y\n'.repeat(80) : undefined });
+  const quoteForCmd = value => `"${String(value).replace(/"/g, '""')}"`;
+  const command = `${quoteForCmd(sdkManager)} ${quoteForCmd(`--sdk_root=${sdkRoot}`)} ${args.map(quoteForCmd).join(' ')}`;
+  // sdkmanager pada Windows adalah file .bat. Jalankan melalui cmd.exe agar
+  // Node tidak mencoba memperlakukannya sebagai executable native.
+  const result = await execa('cmd.exe', ['/d', '/s', '/c', command], { env, all: true, input: acceptLicenses ? 'y\n'.repeat(80) : undefined });
   if (result.all) console.log(result.all);
 }
 
