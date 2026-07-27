@@ -54,6 +54,7 @@ const MIGRATION_CONTAINER_DIR = path.join(ROOT_DIR, 'webmigrasi');
 const MOBILE_CONTAINER_DIR = path.join(ROOT_DIR, 'apkmigrasi');
 const GENERATOR_STATE_PATH = path.join(ROOT_DIR, 'authsesion.json');
 const VERCEL_SESSION_PATH = path.join(ROOT_DIR, 'vercel-session.json');
+const PORTABLE_JDK_DIR = path.join(process.env.LOCALAPPDATA || ROOT_DIR, 'GAS-WebApp-Generator', 'jdk-17');
 
 // ------------------------------------------------------------------
 // UTIL: banner & logging
@@ -99,6 +100,7 @@ async function runInteractive(command, args, cwd, env = undefined) {
 async function findJavaHome() {
   const candidates = [
     process.env.JAVA_HOME,
+    PORTABLE_JDK_DIR,
     'D:\\android studio\\jbr',
     'C:\\Program Files\\Android\\Android Studio\\jbr'
   ].filter(Boolean);
@@ -106,6 +108,39 @@ async function findJavaHome() {
     if (await fs.pathExists(path.join(candidate, 'bin', 'java.exe'))) return candidate;
   }
   return null;
+}
+
+async function installPortableJdk() {
+  if (process.platform !== 'win32') throw new Error('Bootstrap JDK otomatis saat ini tersedia untuk Windows. Instal JDK 17+ melalui package manager OS Anda.');
+  const javaExe = path.join(PORTABLE_JDK_DIR, 'bin', 'java.exe');
+  if (await fs.pathExists(javaExe)) return PORTABLE_JDK_DIR;
+  const baseDir = path.dirname(PORTABLE_JDK_DIR);
+  const downloadDir = path.join(baseDir, '.generator-download-jdk');
+  const zipPath = path.join(downloadDir, 'temurin-17.zip');
+  const extractDir = path.join(downloadDir, 'extract');
+  const url = 'https://api.adoptium.net/v3/binary/latest/17/ga/windows/x64/jdk/hotspot/normal/eclipse';
+  logStep('JDK 17 belum ditemukan — mengunduh Eclipse Temurin JDK portable...');
+  logInfo('Sumber: Eclipse Adoptium (Temurin 17 LTS).');
+  await fs.ensureDir(downloadDir);
+  const response = await fetch(url);
+  if (!response.ok) throw new Error(`Unduhan JDK 17 gagal (HTTP ${response.status}).`);
+  await fs.writeFile(zipPath, Buffer.from(await response.arrayBuffer()));
+  await fs.remove(extractDir);
+  await execa('powershell.exe', ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-Command', `Expand-Archive -LiteralPath '${zipPath.replace(/'/g, "''")}' -DestinationPath '${extractDir.replace(/'/g, "''")}' -Force`], { stdio: 'inherit' });
+  const entries = await fs.readdir(extractDir, { withFileTypes: true });
+  const extractedJdk = entries.map(entry => path.join(extractDir, entry.name)).find(candidate => fs.existsSync(path.join(candidate, 'bin', 'java.exe')));
+  if (!extractedJdk) throw new Error('Arsip JDK tidak memiliki struktur yang diharapkan.');
+  await fs.ensureDir(baseDir);
+  await fs.remove(PORTABLE_JDK_DIR);
+  await fs.move(extractedJdk, PORTABLE_JDK_DIR);
+  await fs.remove(downloadDir);
+  if (!await fs.pathExists(javaExe)) throw new Error('JDK portable gagal diverifikasi setelah ekstraksi.');
+  logSuccess(`JDK 17 portable siap: ${PORTABLE_JDK_DIR}`);
+  return PORTABLE_JDK_DIR;
+}
+
+async function ensureJavaHome() {
+  return (await findJavaHome()) || installPortableJdk();
 }
 
 async function findAndroidSdk() {
@@ -181,11 +216,9 @@ async function runSdkManager(sdkManager, sdkRoot, javaHome, args, acceptLicenses
 }
 
 async function ensureAndroidBuildEnv() {
-  const javaHome = await findJavaHome();
-  if (!javaHome) {
-    logError('JDK belum ditemukan. Instal JDK 17+ atau Android Studio (JBR), kemudian jalankan menu Mobile App kembali.');
-    return null;
-  }
+  let javaHome;
+  try { javaHome = await ensureJavaHome(); }
+  catch (error) { logError(`JDK belum dapat disiapkan otomatis: ${error.message}`); return null; }
   const sdkRoot = (await findAndroidSdk()) || getDefaultAndroidSdkPath();
   const sdkManager = await installAndroidCommandLineTools(sdkRoot);
   const required = [

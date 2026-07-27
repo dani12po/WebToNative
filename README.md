@@ -9,6 +9,7 @@ Gunakan dokumentasi resmi berikut saat menyiapkan lingkungan, mengembangkan hasi
 | Teknologi | Digunakan untuk | Dokumentasi resmi |
 | --- | --- | --- |
 | Node.js | Menjalankan CLI generator | [nodejs.org/docs](https://nodejs.org/en/docs) |
+| Eclipse Temurin JDK 17 | Java portable otomatis untuk build APK | [Adoptium installation](https://adoptium.net/installation/) |
 | Google Apps Script | Web App, API server, dan otomasi Google Workspace | [Google Apps Script](https://developers.google.com/apps-script) |
 | `clasp` | Membuat, push, dan deploy proyek GAS dari terminal | [Panduan clasp Google](https://developers.google.com/apps-script/guides/clasp) |
 | Google Sheets | Database awal Web App GAS | [Spreadsheet service](https://developers.google.com/apps-script/guides/sheets) |
@@ -52,7 +53,7 @@ Mode AI membaca konfigurasi lokal dari `api.txt`. Pilih salah satu provider yang
    npm install -g @google/clasp
    ```
 
-Untuk build APK, sediakan JDK 17+ (JBR bawaan Android Studio juga didukung). Saat menu **Mobile App** dijalankan, generator mendeteksi Android SDK terlebih dahulu. Jika belum ada, generator otomatis mengunduh Android Command-line Tools resmi lalu memasang Platform Tools, Android API 35, dan Build Tools 35.0.0. Android Studio hanya opsional untuk emulator atau debugging visual.
+Saat menu **Mobile App** dijalankan, generator mendeteksi Java dan Android SDK terlebih dahulu. Jika Java belum ada, generator otomatis mengunduh Eclipse Temurin JDK 17 portable ke profil pengguna. Jika Android SDK belum ada, generator otomatis mengunduh Android Command-line Tools resmi lalu memasang Platform Tools, Android API 35, dan Build Tools 35.0.0. Android Studio hanya opsional untuk emulator atau debugging visual.
 
 ## Instalasi
 
@@ -177,7 +178,7 @@ Menu **Mobile App** dirancang agar dapat dipakai pada akun Windows yang berbeda 
 1. Tools mengecek `ANDROID_HOME`, `ANDROID_SDK_ROOT`, lokasi SDK Android Studio, lalu `%LOCALAPPDATA%\Android\Sdk` milik pengguna yang sedang login.
 2. Jika SDK belum ditemukan, tools mengunduh **Android Command-line Tools untuk Windows** dari server resmi Google dan menyimpannya di folder SDK pengguna.
 3. Tools menerima lisensi Android SDK dan memasang `platform-tools`, `platforms;android-35`, serta `build-tools;35.0.0` secara otomatis.
-4. Untuk build APK, Java tetap diperlukan. Tools mencoba `JAVA_HOME`, JBR Android Studio, lalu lokasi Android Studio standar. Instal JDK 17+ hanya jika ketiganya tidak tersedia.
+4. Untuk build APK, tools mencoba `JAVA_HOME`, JBR Android Studio, lalu lokasi Android Studio standar. Jika semuanya tidak tersedia, tools mengunduh Eclipse Temurin JDK 17 portable ke `%LOCALAPPDATA%\GAS-WebApp-Generator\jdk-17` dan hanya memakainya untuk proses generator.
 
 Proses ini memerlukan koneksi internet dan izin menulis ke folder profil Windows pengguna; hak Administrator tidak diperlukan. Bila tools diperbarui dari GitHub, pastikan pengguna mengambil versi terbaru sebelum mencoba lagi:
 
@@ -187,7 +188,7 @@ npm install
 npm start
 ```
 
-Jika instalasi SDK terhenti karena koneksi/proxy kantor, jalankan kembali menu **Mobile App** setelah koneksi tersedia. Bila JDK tidak ditemukan, instal JDK 17+ atau Android Studio lalu jalankan ulang. Pesan `sdkmanager.bat is not recognized` pada versi lama ditangani oleh generator versi terbaru melalui `cmd.exe`; lakukan `git pull origin main` terlebih dahulu.
+Jika instalasi SDK atau JDK terhenti karena koneksi/proxy kantor, jalankan kembali menu **Mobile App** setelah koneksi tersedia. Bila bootstrap JDK tidak dapat diunduh, pengguna tetap dapat memasang JDK 17+ atau Android Studio secara manual lalu menjalankan ulang. Pesan `sdkmanager.bat is not recognized` pada versi lama ditangani oleh generator versi terbaru melalui `cmd.exe`; lakukan `git pull origin main` terlebih dahulu.
 
 ## Struktur proyek
 
