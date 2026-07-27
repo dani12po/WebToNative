@@ -1,6 +1,6 @@
 # GAS Web App Generator
 
-CLI Node.js untuk membuat dan deploy Google Apps Script (GAS) Web App modular, memigrasikan hasilnya ke Next.js, serta membuat wrapper mobile Android/iOS dengan Capacitor.
+CLI Node.js untuk membuat dan deploy Google Apps Script (GAS) Web App modular, memigrasikan hasilnya ke Next.js, serta menghasilkan aplikasi Android native berbasis Jetpack Compose.
 
 ## Kemampuan utama
 
@@ -11,7 +11,7 @@ CLI Node.js untuk membuat dan deploy Google Apps Script (GAS) Web App modular, m
 - Database Google Sheets yang dibuat otomatis ketika GAS Web App pertama kali digunakan.
 - Tema AI opsional untuk memilih palet, font, landing page/login, dashboard, dan blueprint modul bisnis yang tervalidasi.
 - Migrasi GAS ke Next.js dengan landing page SaaS, SEO, API route, skema database, pemeriksaan build, dan QA AI.
-- Wrapper Capacitor untuk Android/iOS, debug APK, dan pengujian pada Android Emulator.
+- Generator Android native Jetpack Compose dengan login, registrasi, database lokal, modul bisnis dinamis, debug APK, serta instalasi ke perangkat Android.
 
 ## Prasyarat
 
@@ -24,7 +24,7 @@ CLI Node.js untuk membuat dan deploy Google Apps Script (GAS) Web App modular, m
    npm install -g @google/clasp
    ```
 
-Untuk fitur Android, install Android Studio, Android SDK Platform-Tools, dan Android Emulator.
+Untuk build APK, instal JDK 17 dan Android SDK Platform-Tools/Build-Tools. Android Studio hanya opsional untuk emulator atau debugging visual.
 
 ## Instalasi
 
@@ -41,8 +41,8 @@ Menu utama menyediakan empat alur:
 
 1. **WebApp New** — membuat dan deploy GAS Web App baru.
 2. **Migrasi Project** — mengubah proyek dari `project/` menjadi aplikasi Next.js di `webmigrasi/`.
-3. **Mobile App** — membuat wrapper Android/iOS dari web Next.js yang sudah dideploy HTTPS.
-4. **Cek Aplikasi** — menjalankan hasil wrapper di Android Emulator.
+3. **Mobile App** — membuat aplikasi Android native Jetpack Compose dan debug APK dari hasil migrasi Next.js.
+4. **Cek Aplikasi** — memasang APK yang sudah dibuat ke HP Android atau emulator yang terdeteksi.
 
 Setelah satu proses selesai, tekan Enter untuk kembali ke menu utama. Sesi `clasp` dipakai ulang sehingga login Google tidak diminta berulang selama sesi masih valid.
 
@@ -115,23 +115,21 @@ Output migrasi mencakup struktur API dan skema database. Untuk produksi multi-us
 
 Tool juga memilih template lokal dari `templates/migration-designs/`. Jika tidak ada template yang sesuai, AI membuat blueprint desain tervalidasi yang dapat digunakan kembali pada migrasi berikutnya.
 
-## Mobile App: Android APK dan iOS wrapper
+## Mobile App: Android native dan APK
 
-Pilih **Mobile App**, lalu pilih hasil migrasi dari `webmigrasi/`. Masukkan URL HTTPS web yang sudah dideploy (contoh: URL Vercel), application ID seperti `com.webapp.kasir`, dan platform yang akan disiapkan.
+Pilih **Mobile App**, lalu pilih hasil migrasi dari `webmigrasi/`. Tool menganalisis modul hasil migrasi dan membuat aplikasi Android native Jetpack Compose pada `apkmigrasi/<nama-proyek>-native/`. Menu seperti transaksi, produk, siswa, absensi, iuran, pembayaran, dan laporan diteruskan menjadi menu aplikasi.
 
-Untuk Android, tool membuat proyek Capacitor di `apkmigrasi/<nama-aplikasi>/`, memasang dependensi, menyinkronkan platform, lalu membuat debug APK tanpa keystore. APK yang siap dipasang berada di:
+Generator membuat login, pendaftaran akun lokal, pemulihan password, dashboard, input data per modul, animasi transisi, serta penyimpanan SQLite lokal. Akun demo awal adalah `Admin / Admin123`.
 
-```text
-apkmigrasi/<nama-aplikasi>/<nama-aplikasi>-debug.apk
-```
-
-Source native Android tersedia pada:
+Tool menjalankan Gradle Wrapper untuk membangun debug APK otomatis. APK hasilnya berada di:
 
 ```text
-apkmigrasi/<nama-aplikasi>/android/
+apkmigrasi/<nama-proyek>-native/<nama-proyek>-debug.apk
 ```
 
-Saat opsi testing emulator dipilih, proyek Android dibuka otomatis di Android Studio. Jika sudah ada Android Virtual Device (AVD), tool menjalankan dan memasang aplikasi ke emulator.
+Setelah build, tool mendeteksi perangkat melalui `adb`. Jika HP dengan **USB debugging** atau emulator aktif tersedia, APK dapat dipasang dan dibuka otomatis. Menu **Cek Aplikasi** memasang APK yang sudah jadi tanpa membangun ulang.
+
+Android Studio tidak diperlukan untuk build APK; gunakan hanya untuk emulator atau debugging visual.
 
 ### Setup Android Emulator satu kali
 
@@ -140,7 +138,7 @@ Saat opsi testing emulator dipilih, proyek Android dibuka otomatis di Android St
 3. Buka **Tools > Device Manager > Create Device**.
 4. Pilih perangkat, unduh/pilih System Image, kemudian selesaikan pembuatan AVD.
 
-Setelah AVD tersedia, gunakan menu **Cek Aplikasi** untuk menyalakan emulator dan menguji aplikasi. Jika SDK sudah mempunyai Command-line Tools dan System Image, tool menawarkan pembuatan AVD standar secara otomatis.
+Setelah AVD tersedia dan sedang berjalan, gunakan menu **Cek Aplikasi** untuk memasang APK ke emulator.
 
 Debug APK digunakan untuk testing internal. APK release, AAB Play Store, iOS archive, dan distribusi publik membutuhkan Android keystore atau Apple provisioning/signing milik pemilik aplikasi.
 
@@ -156,7 +154,7 @@ web-app-generator-GAS/
 |   `-- ...
 |-- project/<nama-proyek>/       # output GAS
 |-- webmigrasi/<nama-proyek>/    # output Next.js
-`-- apkmigrasi/<nama-aplikasi>/  # output Capacitor Android/iOS
+`-- apkmigrasi/<nama>-native/    # output Android native dan APK
 ```
 
 Folder `project/`, `webmigrasi/`, dan `apkmigrasi/` adalah output generator dan tidak di-commit.
