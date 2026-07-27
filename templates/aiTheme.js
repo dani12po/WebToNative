@@ -9,9 +9,30 @@ const PROVIDERS = {
 };
 
 function extractJson(text) {
-  const match = text.match(/\{[\s\S]*\}/);
-  if (!match) throw new Error('AI tidak mengembalikan JSON desain.');
-  return JSON.parse(match[0]);
+  const source = String(text || '').replace(/```json|```/gi, '').trim();
+  for (let start = source.indexOf('{'); start !== -1; start = source.indexOf('{', start + 1)) {
+    let depth = 0;
+    let quoted = false;
+    let escaped = false;
+    for (let index = start; index < source.length; index++) {
+      const char = source[index];
+      if (quoted) {
+        if (escaped) escaped = false;
+        else if (char === '\\') escaped = true;
+        else if (char === '"') quoted = false;
+        continue;
+      }
+      if (char === '"') quoted = true;
+      else if (char === '{') depth++;
+      else if (char === '}') {
+        depth--;
+        if (depth === 0) {
+          try { return JSON.parse(source.slice(start, index + 1)); } catch { break; }
+        }
+      }
+    }
+  }
+  throw new Error('AI tidak mengembalikan JSON desain yang valid.');
 }
 
 function validHex(value, fallback) {
@@ -212,8 +233,8 @@ export async function reviewMobileWrapper(files) {
   const provider = (config.provider || '').toLowerCase();
   const endpoint = provider === 'custom' ? config.endpoint : PROVIDERS[provider]?.endpoint;
   if (!config.api_key || !config.model || !endpoint || !/^https:\/\//.test(endpoint)) return null;
-  const source = Object.entries(files).map(([name, value]) => `FILE: ${name}\n${String(value).slice(0, 6000)}`).join('\n\n').slice(0, 14000);
-  const prompt = `Anda adalah QA aplikasi Capacitor. Tinjau konfigurasi wrapper berikut. Jawab JSON saja: {"status":"ready|needs_review","summary":"maksimal 160 karakter","findings":["maksimal 3 temuan konkret"],"nextStep":"maksimal 120 karakter"}. Status needs_review hanya bila URL bukan HTTPS, appId invalid, atau konfigurasi Capacitor tidak dapat dipakai. Jangan menuntut build iOS pada Windows.\n\n${source}`;
+  const source = ['package.json', 'capacitor.config.json'].filter(name => files[name]).map(name => `FILE: ${name}\n${String(files[name]).slice(0, 6000)}`).join('\n\n');
+  const prompt = `Anda adalah QA konfigurasi proyek Android native. Tinjau hanya package.json dan capacitor.config.json berikut. Jawab tepat satu objek JSON tanpa teks lain: {"status":"ready|needs_review","summary":"maksimal 160 karakter","findings":["maksimal 3 temuan konkret"],"nextStep":"maksimal 120 karakter"}. Status needs_review hanya bila URL bukan HTTPS, appId invalid, atau konfigurasi Capacitor tidak dapat dipakai. Jangan menuntut build iOS pada Windows.\n\n${source}`;
   const response = await fetch(endpoint, { method: 'POST', headers: { Authorization: `Bearer ${config.api_key}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ model: config.model, messages: [{ role: 'user', content: prompt }], temperature: 0.1 }) });
   if (!response.ok) throw new Error(`AI Mobile QA gagal (HTTP ${response.status}).`);
   const result = extractJson((await response.json()).choices?.[0]?.message?.content || '');

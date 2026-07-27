@@ -36,7 +36,7 @@ import { PROJECT_TYPE_CHOICES, getProjectProfile } from './templates/projectProf
 import { getRandomVisualTheme } from './templates/visualThemes.js';
 import { promptAndGenerateAiTheme, analyzeMigrationBuildError, analyzeGasMigrationProject, createMigrationTemplateBlueprint, analyzeGasAppRequirements, reviewMigratedNextApp, requestMigrationAutoRepair, requestGasAutoRepair, analyzeMobileApp, reviewMobileWrapper } from './templates/aiTheme.js';
 import { getNextMigrationFiles } from './templates/nextJsMigration.js';
-import { getMobileWrapperFiles } from './templates/mobileApp.js';
+import { getMobileWrapperFiles, getNativeAndroidActivity } from './templates/mobileApp.js';
 import { findBestMigrationTemplate, saveMigrationTemplate } from './templates/migrationTemplateLibrary.js';
 import { findGasBlueprint, saveGasBlueprint, applyGasBlueprint } from './templates/gasAppTemplateLibrary.js';
 
@@ -135,6 +135,14 @@ async function configureAndroidLocalProperties(targetDir, androidEnv) {
   if (!await fs.pathExists(androidDir)) return;
   const sdkPath = androidEnv.ANDROID_HOME.replace(/\\/g, '\\\\');
   await fs.writeFile(path.join(androidDir, 'local.properties'), `sdk.dir=${sdkPath}\n`, 'utf8');
+  // Android Studio versi baru membaca macro #GRADLE_LOCAL_JAVA_HOME dari
+  // android/.gradle/config.properties. Tulis JDK absolut sebelum project
+  // dibuka agar Sync tidak gagal dengan "Invalid Gradle JDK configuration".
+  const gradleDir = path.join(androidDir, '.gradle');
+  await fs.ensureDir(gradleDir);
+  const javaHome = androidEnv.JAVA_HOME.replace(/\\/g, '/');
+  const sdkHome = androidEnv.ANDROID_HOME.replace(/\\/g, '/');
+  await fs.writeFile(path.join(gradleDir, 'config.properties'), `java.home=${javaHome}\nsdk.dir=${sdkHome}\n`, 'utf8');
 }
 
 async function runNextBuild(cwd) {
@@ -380,11 +388,27 @@ async function getAndroidDevices(androidEnv = null) {
   }
 }
 
-async function waitForAndroidDevice(androidEnv, timeoutMs = 60000) {
+async function isAndroidBootCompleted(androidEnv, device) {
+  try {
+    const adb = path.join(androidEnv.ANDROID_HOME, 'platform-tools', 'adb.exe');
+    const result = await execa(adb, ['-s', device, 'shell', 'getprop', 'sys.boot_completed'], { env: { ...process.env, ...androidEnv } });
+    return result.stdout.trim() === '1';
+  } catch {
+    return false;
+  }
+}
+
+async function waitForAndroidDevice(androidEnv, timeoutMs = 240000) {
   const startedAt = Date.now();
+  let lastProgressAt = 0;
   while (Date.now() - startedAt < timeoutMs) {
     const devices = await getAndroidDevices(androidEnv);
-    if (devices.length) return devices[0];
+    if (devices.length && await isAndroidBootCompleted(androidEnv, devices[0])) return devices[0];
+    const elapsedSeconds = Math.floor((Date.now() - startedAt) / 1000);
+    if (elapsedSeconds - lastProgressAt >= 15) {
+      lastProgressAt = elapsedSeconds;
+      logInfo(`Emulator sedang boot (${elapsedSeconds} detik). Menunggu sampai Android siap...`);
+    }
     await new Promise(resolve => setTimeout(resolve, 3000));
   }
   return null;
@@ -434,12 +458,39 @@ async function openAndroidProjectInStudio(targetDir) {
     logInfo('Android Studio tidak ditemukan otomatis. Buka folder android/ dari proyek mobile secara manual di Android Studio.');
     return false;
   }
-  const androidDir = path.join(targetDir, 'android');
+  // Proyek Capacitor menyimpan Gradle di subfolder android/, sedangkan
+  // generator Kotlin/XML native menaruh settings.gradle.kts di root output.
+  const capacitorAndroidDir = path.join(targetDir, 'android');
+  const androidDir = await fs.pathExists(path.join(targetDir, 'settings.gradle.kts')) ? targetDir : capacitorAndroidDir;
+  if (!await fs.pathExists(path.join(androidDir, 'settings.gradle.kts'))) {
+    logError('File settings.gradle.kts tidak ditemukan; proyek Android belum lengkap sehingga tidak dibuka dalam LightEdit.');
+    return false;
+  }
   const child = execa(studio, [androidDir], { detached: true, stdio: 'ignore' });
   child.catch(() => {});
   child.unref();
   logSuccess('Proyek Android dibuka di Android Studio. APK debug juga tersedia di folder apkmigrasi proyek ini.');
   return true;
+}
+
+async function installNativeAndroidUi(targetDir, mobileConfig) {
+  const javaDir = path.join(targetDir, 'android', 'app', 'src', 'main', 'java', ...mobileConfig.appId.split('.'));
+  const activityPath = path.join(javaDir, 'MainActivity.java');
+  await fs.ensureDir(javaDir);
+  await fs.writeFile(activityPath, getNativeAndroidActivity(mobileConfig), 'utf8');
+  logSuccess('UI Android native dipasang: layar aplikasi tidak lagi menampilkan WebView situs.');
+}
+
+async function getMigratedMobileModules(sourceName) {
+  const configPath = path.join(MIGRATION_CONTAINER_DIR, sourceName, 'lib', 'app-config.js');
+  try {
+    const source = await fs.readFile(configPath, 'utf8');
+    const match = source.match(/export const APP = ([\s\S]+);\s*$/);
+    const appConfig = match ? JSON.parse(match[1]) : null;
+    return Array.isArray(appConfig?.profile?.modules) ? appConfig.profile.modules.map(module => ({ name: module.name, id: module.id, fields: module.fields || [] })) : [];
+  } catch {
+    return [];
+  }
 }
 
 async function offerAndroidAvdSetup(androidEnv, targetDir) {
@@ -488,6 +539,10 @@ async function runAndroidEmulatorTest(targetDir) {
     return;
   }
   let device = (await getAndroidDevices(androidEnv))[0];
+  if (device && !await isAndroidBootCompleted(androidEnv, device)) {
+    logInfo('Android Emulator sudah terdeteksi tetapi masih menyelesaikan boot...');
+    device = await waitForAndroidDevice(androidEnv);
+  }
   if (!device) {
     let avds = [];
     try {
@@ -517,11 +572,11 @@ async function runAndroidEmulatorTest(targetDir) {
       logError(`Gagal menyalakan emulator: ${err.message}`);
       return;
     }
-    logInfo('Menunggu emulator siap (maks. 60 detik)...');
+    logInfo('Menunggu emulator siap (maks. 4 menit; boot pertama dapat lebih lama)...');
     device = await waitForAndroidDevice(androidEnv);
   }
   if (!device) {
-    logError('Emulator belum siap. Nyalakan emulator melalui Android Studio lalu pilih mode Mobile App lagi untuk menjalankan aplikasi.');
+    logError('Emulator belum siap setelah 4 menit. Periksa jendela emulator untuk pesan error, lalu jalankan kembali menu Cek Aplikasi saat Android sudah berada di home screen.');
     return;
   }
   try {
@@ -535,6 +590,46 @@ async function runAndroidEmulatorTest(targetDir) {
 }
 
 async function runMobileWrapperBuild() {
+  const engine = 'native'; /* Pilihan engine lama dipensiunkan: menu 3 selalu Android native.
+    { name: 'Android native Kotlin/XML (Login, Dashboard, RecyclerView) — direkomendasikan', value: 'native' },
+  */
+  if (engine === 'native') {
+    const sources = await fs.pathExists(MIGRATION_CONTAINER_DIR) ? (await fs.readdir(MIGRATION_CONTAINER_DIR, { withFileTypes: true })).filter(entry => entry.isDirectory()).map(entry => ({ name: entry.name, value: entry.name })) : [];
+    if (!sources.length) throw new Error('Belum ada proyek di webmigrasi/. Jalankan menu Migrasi Project terlebih dahulu.');
+    const { sourceName } = await inquirer.prompt([{ type: 'list', name: 'sourceName', message: 'Pilih proyek untuk dibuat menjadi Android native:', choices: sources }]);
+    logStep('AI Native Mobile Preflight — menganalisis kesiapan login, dashboard, menu, dan data...');
+    try {
+      const analysis = await analyzeMobileApp(sourceName, 'https://native-mobile.local');
+      if (analysis) { logSuccess(`AI Native Mobile: ${analysis.summary}`); if (analysis.mobileFocus) logInfo(`Fokus: ${analysis.mobileFocus}`); if (analysis.risk) logInfo(`Risiko: ${analysis.risk}`); }
+      else logInfo('AI Preflight dilewati: api.txt belum tersedia atau tidak valid.');
+    } catch (err) { logError(`AI Native Mobile Preflight gagal: ${err.message}`); logInfo('Pembuatan proyek native tetap dilanjutkan.'); }
+    const targetDir = path.join(MOBILE_CONTAINER_DIR, `${sourceName}-native`);
+    if (await fs.pathExists(targetDir)) {
+      const { overwrite } = await inquirer.prompt([{ type: 'confirm', name: 'overwrite', message: `Folder apkmigrasi/${sourceName}-native sudah ada. Timpa isinya?`, default: false }]);
+      if (!overwrite) return;
+      await fs.emptyDir(targetDir);
+    }
+    logStep('Membuat proyek Android native Kotlin/XML...');
+    await runInteractive(process.execPath, [path.join(ROOT_DIR, 'scripts', 'create-native-android.js'), targetDir], ROOT_DIR);
+    logSuccess(`Proyek Android native siap: ${targetDir}`);
+    await openAndroidProjectInStudio(targetDir);
+    logInfo('Android Studio dibuka otomatis. Tunggu Gradle sync, pilih emulator, lalu tekan Run untuk testing.');
+    return;
+  }
+  const existingApps = await fs.pathExists(MOBILE_CONTAINER_DIR)
+    ? (await fs.readdir(MOBILE_CONTAINER_DIR, { withFileTypes: true })).filter(entry => entry.isDirectory() && fs.existsSync(path.join(MOBILE_CONTAINER_DIR, entry.name, 'android', 'gradlew.bat'))).map(entry => entry.name)
+    : [];
+  if (existingApps.length) {
+    const { workflow } = await inquirer.prompt([{ type: 'list', name: 'workflow', message: 'Mode Mobile App:', choices: [
+      { name: 'Buat/perbarui aplikasi mobile dari hasil migrasi', value: 'create' },
+      { name: 'Build ulang APK cepat (tanpa npm install / Capacitor sync)', value: 'quick' }
+    ] }]);
+    if (workflow === 'quick') {
+      const { appName } = await inquirer.prompt([{ type: 'list', name: 'appName', message: 'Pilih aplikasi untuk build APK cepat:', choices: existingApps }]);
+      await runExistingMobileBuild(path.join(MOBILE_CONTAINER_DIR, appName), appName);
+      return;
+    }
+  }
   const candidates = [];
   if (await fs.pathExists(MIGRATION_CONTAINER_DIR)) {
     for (const entry of await fs.readdir(MIGRATION_CONTAINER_DIR, { withFileTypes: true })) {
@@ -565,13 +660,15 @@ async function runMobileWrapperBuild() {
     logInfo('Pembuatan wrapper dilanjutkan dengan konfigurasi aman.');
   }
   const folderName = answer.sourceName.toLowerCase().replace(/[^a-z0-9-_]/g, '-') || 'mobile-app';
+  const modules = await getMigratedMobileModules(answer.sourceName);
   const targetDir = path.join(MOBILE_CONTAINER_DIR, folderName);
   if (await fs.pathExists(targetDir)) {
     const { overwrite } = await inquirer.prompt([{ type: 'confirm', name: 'overwrite', message: `Folder apkmigrasi/${folderName} sudah ada. Timpa isinya?`, default: false }]);
     if (!overwrite) throw new Error('Pembuatan aplikasi mobile dibatalkan.');
     await fs.emptyDir(targetDir);
   } else await fs.ensureDir(targetDir);
-  const files = getMobileWrapperFiles({ appName: answer.sourceName, appId: answer.appId.trim(), appUrl: answer.appUrl.trim() });
+  const mobileConfig = { appName: answer.sourceName, appId: answer.appId.trim(), appUrl: answer.appUrl.trim(), modules };
+  const files = getMobileWrapperFiles(mobileConfig);
   for (const [name, content] of Object.entries(files)) {
     const filePath = path.join(targetDir, name);
     await fs.ensureDir(path.dirname(filePath));
@@ -603,6 +700,9 @@ async function runMobileWrapperBuild() {
     }
   }
   await runInteractive('npx', ['cap', 'sync'], targetDir);
+  if (answer.platforms.includes('android')) {
+    await installNativeAndroidUi(targetDir, mobileConfig);
+  }
   let androidBuildReady = false;
   if (answer.platforms.includes('android')) {
     try {
@@ -612,7 +712,7 @@ async function runMobileWrapperBuild() {
       await configureAndroidLocalProperties(targetDir, androidEnv);
       logInfo(`Menggunakan Java: ${androidEnv.JAVA_HOME}`);
       logInfo(`Menggunakan Android SDK: ${androidEnv.ANDROID_HOME}`);
-      await runInteractive(path.join(targetDir, 'android', 'gradlew.bat'), ['assembleDebug'], path.join(targetDir, 'android'), androidEnv);
+      await runInteractive('cmd.exe', ['/d', '/s', '/c', 'gradlew.bat assembleDebug'], path.join(targetDir, 'android'), androidEnv);
       const builtApk = path.join(targetDir, 'android', 'app', 'build', 'outputs', 'apk', 'debug', 'app-debug.apk');
       const convenientApk = path.join(targetDir, `${folderName}-debug.apk`);
       if (!await fs.pathExists(builtApk)) throw new Error('APK debug tidak ditemukan setelah Gradle selesai.');
@@ -635,6 +735,23 @@ async function runMobileWrapperBuild() {
         logSuccess('Build iOS selesai; lanjutkan signing/distribusi melalui Xcode.');
       } catch (err) { logError('Build iOS gagal. Periksa Xcode, provisioning profile, dan Apple Developer signing.'); }
     }
+  }
+}
+
+async function runExistingMobileBuild(targetDir, appName) {
+  try {
+    logStep(`Build APK cepat: ${appName}...`);
+    const androidEnv = await getAndroidBuildEnv();
+    if (!androidEnv) throw new Error('JDK atau Android SDK tidak ditemukan.');
+    await configureAndroidLocalProperties(targetDir, androidEnv);
+    await runInteractive('cmd.exe', ['/d', '/s', '/c', 'gradlew.bat assembleDebug'], path.join(targetDir, 'android'), androidEnv);
+    const builtApk = path.join(targetDir, 'android', 'app', 'build', 'outputs', 'apk', 'debug', 'app-debug.apk');
+    const outputApk = path.join(targetDir, `${appName}-debug.apk`);
+    if (!await fs.pathExists(builtApk)) throw new Error('APK debug tidak ditemukan setelah build.');
+    await fs.copy(builtApk, outputApk, { overwrite: true });
+    logSuccess(`Build cepat selesai. APK: ${outputApk}`);
+  } catch (err) {
+    logError(`Build APK cepat gagal: ${err.message}`);
   }
 }
 
