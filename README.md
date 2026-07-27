@@ -2,6 +2,33 @@
 
 CLI Node.js untuk membuat dan deploy Google Apps Script (GAS) Web App modular, memigrasikan hasilnya ke Next.js, serta menghasilkan aplikasi Android native berbasis Jetpack Compose.
 
+## Teknologi & dokumentasi resmi
+
+Gunakan dokumentasi resmi berikut saat menyiapkan lingkungan, mengembangkan hasil generator, atau melakukan deployment produksi:
+
+| Teknologi | Digunakan untuk | Dokumentasi resmi |
+| --- | --- | --- |
+| Node.js | Menjalankan CLI generator | [nodejs.org/docs](https://nodejs.org/en/docs) |
+| Google Apps Script | Web App, API server, dan otomasi Google Workspace | [Google Apps Script](https://developers.google.com/apps-script) |
+| `clasp` | Membuat, push, dan deploy proyek GAS dari terminal | [Panduan clasp Google](https://developers.google.com/apps-script/guides/clasp) |
+| Google Sheets | Database awal Web App GAS | [Spreadsheet service](https://developers.google.com/apps-script/guides/sheets) |
+| Next.js | Hasil migrasi web modern | [Next.js Docs](https://nextjs.org/docs) |
+| Vercel | Deployment hasil migrasi Next.js | [Vercel Documentation](https://vercel.com/docs) |
+| Android Jetpack Compose | UI aplikasi Android native | [Android Compose](https://developer.android.com/compose) |
+| Gradle | Build debug APK Android otomatis | [Gradle User Manual](https://docs.gradle.org/current/userguide/userguide.html) |
+| Android Debug Bridge | Instalasi dan preview APK di perangkat/emulator | [ADB documentation](https://developer.android.com/tools/adb) |
+
+### Provider AI opsional
+
+Mode AI membaca konfigurasi lokal dari `api.txt`. Pilih salah satu provider yang didukung dan gunakan dokumentasi resminya untuk membuat API key serta memilih model:
+
+- [OpenAI API documentation](https://developers.openai.com/api/docs)
+- [Groq documentation](https://console.groq.com/docs/overview)
+- [NVIDIA NIM documentation](https://docs.nvidia.com/nim/)
+- [OpenRouter documentation](https://openrouter.ai/docs/quickstart)
+
+> API key bersifat rahasia. Simpan hanya pada `api.txt` lokal dan jangan commit file tersebut ke GitHub.
+
 ## Kemampuan utama
 
 - 54+ preset aplikasi, termasuk kasir, toko fashion, laundry, bengkel, booking, sekolah, BIMBA, klinik, inventaris, keuangan, HR, dan restoran.
