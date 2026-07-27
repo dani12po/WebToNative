@@ -17,6 +17,7 @@ Gunakan dokumentasi resmi berikut saat menyiapkan lingkungan, mengembangkan hasi
 | Android Jetpack Compose | UI aplikasi Android native | [Android Compose](https://developer.android.com/compose) |
 | Gradle | Build debug APK Android otomatis | [Gradle User Manual](https://docs.gradle.org/current/userguide/userguide.html) |
 | Android Debug Bridge | Instalasi dan preview APK di perangkat/emulator | [ADB documentation](https://developer.android.com/tools/adb) |
+| Android Command-line Tools | Instalasi SDK dan komponen build otomatis | [Android SDK Command-line Tools](https://developer.android.com/studio#command-tools) |
 
 ### Provider AI opsional
 
@@ -168,6 +169,25 @@ Android Studio tidak diperlukan untuk build APK; gunakan hanya untuk emulator at
 Setelah AVD tersedia dan sedang berjalan, gunakan menu **Cek Aplikasi** untuk memasang APK ke emulator.
 
 Debug APK digunakan untuk testing internal. APK release, AAB Play Store, iOS archive, dan distribusi publik membutuhkan Android keystore atau Apple provisioning/signing milik pemilik aplikasi.
+
+### Instalasi Android SDK otomatis di komputer lain
+
+Menu **Mobile App** dirancang agar dapat dipakai pada akun Windows yang berbeda tanpa mengatur path SDK secara manual.
+
+1. Tools mengecek `ANDROID_HOME`, `ANDROID_SDK_ROOT`, lokasi SDK Android Studio, lalu `%LOCALAPPDATA%\Android\Sdk` milik pengguna yang sedang login.
+2. Jika SDK belum ditemukan, tools mengunduh **Android Command-line Tools untuk Windows** dari server resmi Google dan menyimpannya di folder SDK pengguna.
+3. Tools menerima lisensi Android SDK dan memasang `platform-tools`, `platforms;android-35`, serta `build-tools;35.0.0` secara otomatis.
+4. Untuk build APK, Java tetap diperlukan. Tools mencoba `JAVA_HOME`, JBR Android Studio, lalu lokasi Android Studio standar. Instal JDK 17+ hanya jika ketiganya tidak tersedia.
+
+Proses ini memerlukan koneksi internet dan izin menulis ke folder profil Windows pengguna; hak Administrator tidak diperlukan. Bila tools diperbarui dari GitHub, pastikan pengguna mengambil versi terbaru sebelum mencoba lagi:
+
+```powershell
+git pull origin main
+npm install
+npm start
+```
+
+Jika instalasi SDK terhenti karena koneksi/proxy kantor, jalankan kembali menu **Mobile App** setelah koneksi tersedia. Bila JDK tidak ditemukan, instal JDK 17+ atau Android Studio lalu jalankan ulang. Pesan `sdkmanager.bat is not recognized` pada versi lama ditangani oleh generator versi terbaru melalui `cmd.exe`; lakukan `git pull origin main` terlebih dahulu.
 
 ## Struktur proyek
 

@@ -132,8 +132,11 @@ async function getAndroidCommandLineToolsUrl() {
     const response = await fetch('https://dl.google.com/android/repository/repository2-1.xml');
     if (!response.ok) return fallback;
     const repository = await response.text();
-    const match = repository.match(/<remotePackage path="cmdline-tools;latest"[\s\S]*?<archive>[\s\S]*?<url>([^<]+)<\/url>/);
-    return match ? `https://dl.google.com/android/repository/${match[1].trim()}` : fallback;
+    const packageBlock = repository.match(/<remotePackage path="cmdline-tools;latest">([\s\S]*?)<\/remotePackage>/)?.[1] || '';
+    const archives = [...packageBlock.matchAll(/<archive>([\s\S]*?)<\/archive>/g)].map(match => match[1]);
+    const windowsArchive = archives.find(archive => /<host-os>windows<\/host-os>/.test(archive));
+    const archiveUrl = windowsArchive?.match(/<url>([^<]+)<\/url>/)?.[1];
+    return archiveUrl ? `https://dl.google.com/android/repository/${archiveUrl.trim()}` : fallback;
   } catch {
     return fallback;
   }
@@ -162,6 +165,7 @@ async function installAndroidCommandLineTools(sdkRoot) {
   await fs.remove(targetTools);
   await fs.move(extractedTools, targetTools);
   await fs.remove(downloadDir);
+  if (!await fs.pathExists(sdkManager)) throw new Error('Command-line Tools Windows berhasil diunduh, tetapi sdkmanager.bat tidak ditemukan setelah ekstraksi. Hapus folder cmdline-tools lalu jalankan ulang menu Mobile App.');
   logSuccess(`Android Command-line Tools terpasang: ${targetTools}`);
   return sdkManager;
 }
