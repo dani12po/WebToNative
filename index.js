@@ -132,7 +132,7 @@ async function getAndroidBuildEnv() {
 }
 
 async function configureAndroidLocalProperties(targetDir, androidEnv) {
-  const androidDir = path.join(targetDir, 'android');
+  const androidDir = await fs.pathExists(path.join(targetDir, 'settings.gradle.kts')) ? targetDir : path.join(targetDir, 'android');
   if (!await fs.pathExists(androidDir)) return;
   const sdkPath = androidEnv.ANDROID_HOME.replace(/\\/g, '\\\\');
   await fs.writeFile(path.join(androidDir, 'local.properties'), `sdk.dir=${sdkPath}\n`, 'utf8');
@@ -446,6 +446,23 @@ async function getAndroidDevices(androidEnv = null) {
   }
 }
 
+async function installApkToConnectedDevice(apkPath, androidEnv, applicationId = '') {
+  const devices = await getAndroidDevices(androidEnv);
+  if (!devices.length) {
+    logInfo('APK siap. Hubungkan HP Android dengan USB debugging untuk instal otomatis, atau salin file APK ke HP dan instal manual.');
+    return false;
+  }
+  const { device } = await inquirer.prompt([{ type: 'list', name: 'device', message: 'Pilih perangkat Android untuk memasang APK:', choices: devices }]);
+  const adb = path.join(androidEnv.ANDROID_HOME, 'platform-tools', 'adb.exe');
+  logStep(`Memasang APK ke perangkat ${device}...`);
+  await runInteractive(adb, ['-s', device, 'install', '-r', apkPath], path.dirname(apkPath), androidEnv);
+  if (applicationId) {
+    try { await runInteractive(adb, ['-s', device, 'shell', 'monkey', '-p', applicationId, '1'], path.dirname(apkPath), androidEnv); } catch { logInfo('APK terpasang, tetapi aplikasi perlu dibuka dari layar utama perangkat.'); }
+  }
+  logSuccess('APK berhasil dipasang ke HP. Buka aplikasi dari layar utama perangkat.');
+  return true;
+}
+
 async function isAndroidBootCompleted(androidEnv, device) {
   try {
     const adb = path.join(androidEnv.ANDROID_HOME, 'platform-tools', 'adb.exe');
@@ -655,6 +672,8 @@ async function runMobileWrapperBuild() {
     const sources = await fs.pathExists(MIGRATION_CONTAINER_DIR) ? (await fs.readdir(MIGRATION_CONTAINER_DIR, { withFileTypes: true })).filter(entry => entry.isDirectory()).map(entry => ({ name: entry.name, value: entry.name })) : [];
     if (!sources.length) throw new Error('Belum ada proyek di webmigrasi/. Jalankan menu Migrasi Project terlebih dahulu.');
     const { sourceName } = await inquirer.prompt([{ type: 'list', name: 'sourceName', message: 'Pilih proyek untuk dibuat menjadi Android native:', choices: sources }]);
+    const { apiUrl } = await inquirer.prompt([{ type: 'input', name: 'apiUrl', message: 'URL API/website Next.js (opsional, untuk integrasi backend nanti):', default: '' }]);
+    const sourceDir = path.join(MIGRATION_CONTAINER_DIR, sourceName);
     logStep('AI Native Mobile Preflight — menganalisis kesiapan login, dashboard, menu, dan data...');
     try {
       const analysis = await analyzeMobileApp(sourceName, 'https://native-mobile.local');
@@ -667,11 +686,20 @@ async function runMobileWrapperBuild() {
       if (!overwrite) return;
       await fs.emptyDir(targetDir);
     }
-    logStep('Membuat proyek Android native Kotlin/XML...');
-    await runInteractive(process.execPath, [path.join(ROOT_DIR, 'scripts', 'create-native-android.js'), targetDir], ROOT_DIR);
+    logStep('Membuat proyek Android native Jetpack Compose...');
+    await runInteractive(process.execPath, [path.join(ROOT_DIR, 'scripts', 'create-native-android.js'), targetDir, sourceName, sourceDir, apiUrl.trim()], ROOT_DIR);
     logSuccess(`Proyek Android native siap: ${targetDir}`);
-    await openAndroidProjectInStudio(targetDir);
-    logInfo('Android Studio dibuka otomatis. Tunggu Gradle sync, pilih emulator, lalu tekan Run untuk testing.');
+    const nativeWrapper = path.join(targetDir, process.platform === 'win32' ? 'gradlew.bat' : 'gradlew');
+    const androidEnv = await getAndroidBuildEnv();
+    if (androidEnv && await fs.pathExists(nativeWrapper)) {
+      try {
+        logStep('Membuat APK debug Android native...');
+        await runInteractive(nativeWrapper, ['assembleDebug', '--console=plain'], targetDir, androidEnv);
+        const nativeApk = path.join(targetDir, 'app', 'build', 'outputs', 'apk', 'debug', 'app-debug.apk');
+        const outputApk = path.join(targetDir, `${sourceName}-debug.apk`);
+        if (await fs.pathExists(nativeApk)) { await fs.copy(nativeApk, outputApk, { overwrite: true }); logSuccess(`APK siap: ${outputApk}`); const appId = `com.otomatis.${sourceName.toLowerCase().replace(/[^a-z0-9]+/g, '').replace(/^([^a-z])/, 'app$1').slice(0, 40) || 'aplikasi'}`; await installApkToConnectedDevice(outputApk, androidEnv, appId); }
+      } catch (err) { logError(`Build APK otomatis gagal: ${err.message}`); logInfo('Periksa Java/Android SDK dan virtual memory Windows; Android Studio tidak diperlukan untuk build APK.'); }
+    } else logInfo('JDK, Android SDK, atau Gradle Wrapper belum tersedia. Install Android SDK Command-line Tools dan Build Tools; Android Studio tidak diperlukan.');
     return;
   }
   const existingApps = await fs.pathExists(MOBILE_CONTAINER_DIR)
@@ -818,13 +846,34 @@ async function runMobileAppCheck() {
   const entries = await fs.readdir(MOBILE_CONTAINER_DIR, { withFileTypes: true });
   const choices = [];
   for (const entry of entries) {
-    if (entry.isDirectory() && await fs.pathExists(path.join(MOBILE_CONTAINER_DIR, entry.name, 'package.json'))) {
+    if (entry.isDirectory() && (await fs.pathExists(path.join(MOBILE_CONTAINER_DIR, entry.name, 'package.json')) || await fs.pathExists(path.join(MOBILE_CONTAINER_DIR, entry.name, 'settings.gradle.kts')))) {
       choices.push({ name: entry.name, value: entry.name });
     }
   }
   if (!choices.length) throw new Error('Tidak ada aplikasi mobile yang siap dicek di folder apkmigrasi/.');
   const { appName } = await inquirer.prompt([{ type: 'list', name: 'appName', message: 'Pilih aplikasi dari apkmigrasi/ untuk dijalankan:', choices }]);
   const targetDir = path.join(MOBILE_CONTAINER_DIR, appName);
+  if (await fs.pathExists(path.join(targetDir, 'settings.gradle.kts'))) {
+    const apkCandidates = [
+      path.join(targetDir, `${appName.replace(/-native$/, '')}-debug.apk`),
+      path.join(targetDir, 'app', 'build', 'outputs', 'apk', 'debug', 'app-debug.apk')
+    ];
+    const apkPath = apkCandidates.find(candidate => fs.existsSync(candidate));
+    if (!apkPath) {
+      logError('APK belum ditemukan. Jalankan menu Mobile App terlebih dahulu sampai build APK berhasil.');
+      return;
+    }
+    const androidEnv = await getAndroidBuildEnv();
+    if (!androidEnv) {
+      logError('Android SDK/JDK tidak ditemukan, sehingga APK belum dapat dipreview.');
+      return;
+    }
+    logStep(`Preview APK ${appName} pada perangkat Android...`);
+    const nativeGradle = await fs.readFile(path.join(targetDir, 'app', 'build.gradle.kts'), 'utf8').catch(() => '');
+    const applicationId = nativeGradle.match(/applicationId\s*=\s*"([^"]+)"/)?.[1] || '';
+    await installApkToConnectedDevice(apkPath, androidEnv, applicationId);
+    return;
+  }
   if (!await fs.pathExists(path.join(targetDir, 'android'))) {
     logInfo('Platform Android belum disiapkan. Menjalankan sinkronisasi Capacitor terlebih dahulu...');
     await runInteractive('npm', ['install'], targetDir);
