@@ -51,7 +51,7 @@ Mode AI membaca konfigurasi lokal dari `api.txt`. Pilih salah satu provider yang
    npm install -g @google/clasp
    ```
 
-Untuk build APK, instal JDK 17 dan Android SDK Platform-Tools/Build-Tools. Android Studio hanya opsional untuk emulator atau debugging visual.
+Untuk build APK, sediakan JDK 17+ (JBR bawaan Android Studio juga didukung). Saat menu **Mobile App** dijalankan, generator mendeteksi Android SDK terlebih dahulu. Jika belum ada, generator otomatis mengunduh Android Command-line Tools resmi lalu memasang Platform Tools, Android API 35, dan Build Tools 35.0.0. Android Studio hanya opsional untuk emulator atau debugging visual.
 
 ## Instalasi
 

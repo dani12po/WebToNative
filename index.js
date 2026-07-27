@@ -117,9 +117,81 @@ async function findAndroidSdk() {
     'C:\\Android\\Sdk'
   ].filter(Boolean);
   for (const candidate of candidates) {
-    if (await fs.pathExists(path.join(candidate, 'platform-tools', 'adb.exe'))) return candidate;
+    if (await fs.pathExists(path.join(candidate, 'platform-tools', 'adb.exe')) || await fs.pathExists(path.join(candidate, 'cmdline-tools', 'latest', 'bin', 'sdkmanager.bat'))) return candidate;
   }
   return null;
+}
+
+function getDefaultAndroidSdkPath() {
+  return process.env.ANDROID_HOME || process.env.ANDROID_SDK_ROOT || path.join(process.env.LOCALAPPDATA || ROOT_DIR, 'Android', 'Sdk');
+}
+
+async function getAndroidCommandLineToolsUrl() {
+  const fallback = 'https://dl.google.com/android/repository/commandlinetools-win-13114758_latest.zip';
+  try {
+    const response = await fetch('https://dl.google.com/android/repository/repository2-1.xml');
+    if (!response.ok) return fallback;
+    const repository = await response.text();
+    const match = repository.match(/<remotePackage path="cmdline-tools;latest"[\s\S]*?<archive>[\s\S]*?<url>([^<]+)<\/url>/);
+    return match ? `https://dl.google.com/android/repository/${match[1].trim()}` : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+async function installAndroidCommandLineTools(sdkRoot) {
+  if (process.platform !== 'win32') throw new Error('Instalasi SDK otomatis saat ini tersedia untuk Windows. Instal Android Command-line Tools melalui package manager OS Anda.');
+  const sdkManager = path.join(sdkRoot, 'cmdline-tools', 'latest', 'bin', 'sdkmanager.bat');
+  if (await fs.pathExists(sdkManager)) return sdkManager;
+  const url = await getAndroidCommandLineToolsUrl();
+  const downloadDir = path.join(sdkRoot, '.generator-download');
+  const zipPath = path.join(downloadDir, 'commandlinetools-win.zip');
+  const extractDir = path.join(downloadDir, 'extract');
+  logStep('Android SDK belum ditemukan — mengunduh Android Command-line Tools resmi...');
+  logInfo(url);
+  await fs.ensureDir(downloadDir);
+  const response = await fetch(url);
+  if (!response.ok) throw new Error(`Unduhan Android Command-line Tools gagal (HTTP ${response.status}).`);
+  await fs.writeFile(zipPath, Buffer.from(await response.arrayBuffer()));
+  await fs.remove(extractDir);
+  await execa('powershell.exe', ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-Command', `Expand-Archive -LiteralPath '${zipPath.replace(/'/g, "''")}' -DestinationPath '${extractDir.replace(/'/g, "''")}' -Force`], { stdio: 'inherit' });
+  const extractedTools = path.join(extractDir, 'cmdline-tools');
+  if (!await fs.pathExists(extractedTools)) throw new Error('Arsip Android Command-line Tools tidak memiliki struktur yang diharapkan.');
+  const targetTools = path.join(sdkRoot, 'cmdline-tools', 'latest');
+  await fs.ensureDir(path.dirname(targetTools));
+  await fs.remove(targetTools);
+  await fs.move(extractedTools, targetTools);
+  await fs.remove(downloadDir);
+  logSuccess(`Android Command-line Tools terpasang: ${targetTools}`);
+  return sdkManager;
+}
+
+async function runSdkManager(sdkManager, sdkRoot, javaHome, args, acceptLicenses = false) {
+  const env = { ...process.env, JAVA_HOME: javaHome, ANDROID_HOME: sdkRoot, ANDROID_SDK_ROOT: sdkRoot, Path: `${path.join(javaHome, 'bin')};${process.env.Path || process.env.PATH || ''}` };
+  const result = await execa(sdkManager, [`--sdk_root=${sdkRoot}`, ...args], { env, all: true, input: acceptLicenses ? 'y\n'.repeat(80) : undefined });
+  if (result.all) console.log(result.all);
+}
+
+async function ensureAndroidBuildEnv() {
+  const javaHome = await findJavaHome();
+  if (!javaHome) {
+    logError('JDK belum ditemukan. Instal JDK 17+ atau Android Studio (JBR), kemudian jalankan menu Mobile App kembali.');
+    return null;
+  }
+  const sdkRoot = (await findAndroidSdk()) || getDefaultAndroidSdkPath();
+  const sdkManager = await installAndroidCommandLineTools(sdkRoot);
+  const required = [
+    path.join(sdkRoot, 'platform-tools', 'adb.exe'),
+    path.join(sdkRoot, 'platforms', 'android-35', 'android.jar'),
+    path.join(sdkRoot, 'build-tools', '35.0.0')
+  ];
+  if (!(await Promise.all(required.map(item => fs.pathExists(item)))).every(Boolean)) {
+    logStep('Menyiapkan Android SDK untuk build APK (Platform Tools, API 35, Build Tools)...');
+    await runSdkManager(sdkManager, sdkRoot, javaHome, ['--licenses'], true);
+    await runSdkManager(sdkManager, sdkRoot, javaHome, ['platform-tools', 'platforms;android-35', 'build-tools;35.0.0']);
+    logSuccess('Android SDK siap untuk build APK.');
+  } else logInfo(`Android SDK terdeteksi dan siap: ${sdkRoot}`);
+  return getAndroidBuildEnv();
 }
 
 async function getAndroidBuildEnv() {
@@ -690,7 +762,7 @@ async function runMobileWrapperBuild() {
     await runInteractive(process.execPath, [path.join(ROOT_DIR, 'scripts', 'create-native-android.js'), targetDir, sourceName, sourceDir, apiUrl.trim()], ROOT_DIR);
     logSuccess(`Proyek Android native siap: ${targetDir}`);
     const nativeWrapper = path.join(targetDir, process.platform === 'win32' ? 'gradlew.bat' : 'gradlew');
-    const androidEnv = await getAndroidBuildEnv();
+    const androidEnv = await ensureAndroidBuildEnv();
     if (androidEnv && await fs.pathExists(nativeWrapper)) {
       try {
         logStep('Membuat APK debug Android native...');
