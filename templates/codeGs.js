@@ -14,6 +14,7 @@ function apiLogin(username, password) { try { return AUTH_login(username, passwo
 function apiRegister(payload) { try { return AUTH_register(payload); } catch (err) { return { success: false, message: err.message }; } }
 function apiSaveRecord(payload) { try { return DB_saveRecord(payload); } catch (err) { return { success: false, message: err.message }; } }
 function apiGetDashboard(moduleId, userRole) { try { return DB_getDashboard(moduleId, userRole); } catch (err) { return { success: false, message: err.message }; } }
+function apiGetOverview(userRole) { try { return DB_getOverview(userRole); } catch (err) { return { success: false, message: err.message }; } }
 function apiGetPaymentMethods() { try { return { success: true, data: DB_getPaymentMethods() }; } catch (err) { return { success: false, message: err.message }; } }
 function apiUpdateMyAccount(payload) { try { return DB_updateMyAccount(payload); } catch (err) { return { success: false, message: err.message }; } }
 function apiGetUsers(adminUsername, adminPassword) { try { return DB_getUsers(adminUsername, adminPassword); } catch (err) { return { success: false, message: err.message }; } }
