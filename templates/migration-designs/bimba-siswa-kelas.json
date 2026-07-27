@@ -1,0 +1,19 @@
+{
+  "id": "bimba-siswa-kelas",
+  "name": "Sistem Kelola Siswa, Kehadiran, dan Iuran Sekolah",
+  "match": [
+    "siswa",
+    "kelas",
+    "kehadiran",
+    "iuran",
+    "pembayaran",
+    "pengaturan harga",
+    "metode pembayaran"
+  ],
+  "layout": "sidebar",
+  "landing": "split",
+  "accent": "#2563EB",
+  "accent2": "#7C3AED",
+  "description": "Aplikasi pendidikan untuk mengelola data siswa, kehadiran, kelas, dan iuran dengan antarmuka intuitif bagi guru dan admin.",
+  "source": "ai"
+}

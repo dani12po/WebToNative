@@ -4,5 +4,6 @@ webmigrasi/
 apkmigrasi/
 .clasprc.json
 authsesion.json
+vercel-session.json
 api.txt
 *.log

@@ -71,7 +71,10 @@ export async function findBestMigrationTemplate(profile, analysis) {
     score: design.match.reduce((total, keyword) => total + (corpus.includes(keyword) ? Math.max(2, keyword.split(' ').length * 2) : 0), 0)
   })).sort((a, b) => b.score - a.score);
   const best = ranked[0];
-  return best && best.score >= 4 ? { ...best, matched: true } : { design: fallbackDesign, score: best?.score || 0, matched: false };
+  // Template lokal hanya cukup spesifik bila minimal 8 poin kecocokan.
+  // Skor di bawah batas ini memakai blueprint AI agar domain seperti
+  // pendidikan tidak mewarisi layout/SEO aplikasi retail secara keliru.
+  return best && best.score >= 8 ? { ...best, matched: true } : { design: fallbackDesign, score: best?.score || 0, matched: false };
 }
 
 export async function saveMigrationTemplate(design) {
