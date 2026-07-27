@@ -38,16 +38,18 @@ include(":app")
 write(path.join(root, 'build.gradle.kts'), `plugins {
   // AGP 9.1.1 is compatible with Gradle 9.3.1 and uses built-in Kotlin.
   id("com.android.application") version "9.1.1" apply false
+  // Kotlin 2.x requires this plugin whenever Compose is enabled.
+  id("org.jetbrains.kotlin.plugin.compose") version "2.2.10" apply false
 }
 `);
 write(path.join(root, 'gradle.properties'), `# Kept modest so first APK build also works on PCs with a small Windows paging file.
-org.gradle.jvmargs=-Xmx384m -Xss512k -Dfile.encoding=UTF-8
+org.gradle.jvmargs=-Xmx512m -Xss512k -Dfile.encoding=UTF-8
 org.gradle.daemon=false
 org.gradle.workers.max=1
 android.useAndroidX=true
 kotlin.code.style=official
 `);
-write(path.join(root, 'app', 'build.gradle.kts'), `plugins { id("com.android.application") }
+write(path.join(root, 'app', 'build.gradle.kts'), `plugins { id("com.android.application"); id("org.jetbrains.kotlin.plugin.compose") }
 android { namespace = "${pkg}"; compileSdk = 35
  defaultConfig { applicationId = "${pkg}"; minSdk = 24; targetSdk = 35; versionCode = 1; versionName = "1.0.0" }
 }
@@ -62,7 +64,7 @@ dependencies {
 `);
 write(path.join(root, 'app', 'src', 'main', 'AndroidManifest.xml'), `<manifest xmlns:android="http://schemas.android.com/apk/res/android"><uses-permission android:name="android.permission.INTERNET"/><application android:allowBackup="true" android:label="${xml(appName)}" android:theme="@style/Theme.GeneratedApp"><activity android:name=".DashboardActivity" android:exported="false"/><activity android:name=".ForgotPasswordActivity" android:exported="false"/><activity android:name=".RegisterActivity" android:exported="false"/><activity android:name=".LoginActivity" android:exported="true"><intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent-filter></activity></application></manifest>`);
 write(path.join(res, 'values', 'colors.xml'), `<resources><color name="primary">#3157D5</color><color name="secondary">#7C4DFF</color><color name="surface">#F7F8FC</color><color name="ink">#14213D</color></resources>`);
-write(path.join(res, 'values', 'themes.xml'), `<resources><style name="Theme.GeneratedApp" parent="Theme.Material3.DayNight.NoActionBar"><item name="colorPrimary">@color/primary</item><item name="colorSecondary">@color/secondary</item><item name="android:fontFamily">sans</item><item name="android:windowActionModeOverlay">true</item><item name="android:windowLightStatusBar">false</item></style></resources>`);
+write(path.join(res, 'values', 'themes.xml'), `<resources><style name="Theme.GeneratedApp" parent="android:style/Theme.Material.Light.NoActionBar"><item name="android:fontFamily">sans</item><item name="android:navigationBarColor">@color/surface</item></style></resources>`);
 write(path.join(res, 'anim', 'slide_in.xml'), `<set xmlns:android="http://schemas.android.com/apk/res/android"><translate android:fromXDelta="12%" android:toXDelta="0" android:duration="220"/><alpha android:fromAlpha="0" android:toAlpha="1" android:duration="180"/></set>`);
 write(path.join(res, 'anim', 'fade_out.xml'), `<alpha xmlns:android="http://schemas.android.com/apk/res/android" android:fromAlpha="1" android:toAlpha="0" android:duration="160"/>`);
 write(path.join(res, 'menu', 'drawer_menu.xml'), `<menu xmlns:android="http://schemas.android.com/apk/res/android"><group android:checkableBehavior="single">${menuItems}</group></menu>`);
@@ -106,7 +108,7 @@ class DashboardActivity:AppCompatActivity(){private lateinit var db:AppDatabase;
 `);
 // Compose is the primary experience. Legacy XML files above remain harmless and
 // make older Android Studio installations able to index the project as well.
-write(path.join(root, 'app', 'build.gradle.kts'), `plugins { id("com.android.application") }
+write(path.join(root, 'app', 'build.gradle.kts'), `plugins { id("com.android.application"); id("org.jetbrains.kotlin.plugin.compose") }
 android { namespace = "${pkg}"; compileSdk = 35
  defaultConfig { applicationId = "${pkg}"; minSdk = 24; targetSdk = 35; versionCode = 1; versionName = "1.0.0" }
  buildFeatures { compose = true }
@@ -118,18 +120,25 @@ dependencies {
  implementation("androidx.compose.ui:ui")
  implementation("androidx.compose.ui:ui-tooling-preview")
  implementation("androidx.compose.material3:material3")
- implementation("androidx.compose.material:material-icons-extended")
  debugImplementation("androidx.compose.ui:ui-tooling")
 }
 `);
 write(path.join(root, 'app', 'src', 'main', 'AndroidManifest.xml'), `<manifest xmlns:android="http://schemas.android.com/apk/res/android"><application android:allowBackup="true" android:label="${xml(appName)}" android:theme="@style/Theme.GeneratedApp"><activity android:name=".MainActivity" android:screenOrientation="portrait" android:exported="true"><intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent-filter></activity></application></manifest>`);
+// The Compose app must be the only source set compiled. Remove the transitional
+// XML activity code so it cannot introduce missing AppCompat dependencies.
+for (const legacy of ['DashboardActivity.kt', 'LoginActivity.kt', 'RegisterActivity.kt', 'ForgotPasswordActivity.kt', 'AppDatabase.kt']) {
+  fs.rmSync(path.join(javaDir, legacy), { force: true });
+}
+for (const legacyResourceDir of ['layout', 'menu', 'anim']) {
+  fs.rmSync(path.join(res, legacyResourceDir), { recursive: true, force: true });
+}
 write(path.join(javaDir, 'data', 'AppRepository.kt'), `package ${pkg}.data
 import android.content.Context
 data class AppRecord(val module:String,val title:String,val time:Long)
 class AppRepository(context:Context){private val p=context.getSharedPreferences("app_data",Context.MODE_PRIVATE)
  fun login(user:String,pass:String)=((user=="Admin"&&pass=="Admin123")||(p.getString("email","")==user&&p.getString("password","")==pass))
  fun register(email:String,password:String){p.edit().putString("email",email).putString("password",password).apply()}
- fun records(module:String):List<AppRecord>=(p.getString("records","")?:"").split("\\n").filter{it.isNotBlank()}.mapNotNull{val x=it.split("|",limit=3);if(x.size==3&&x[0]==module)AppRecord(x[0],x[1],x[2].toLongOrNull()?:0)else null}.sortedByDescending{it.time}
+ fun records(module:String): List<AppRecord> = (p.getString("records","")?:"").split("\\n").filter{it.isNotBlank()}.mapNotNull{val x=it.split("|",limit=3);if(x.size==3&&x[0]==module)AppRecord(x[0],x[1],x[2].toLongOrNull()?:0)else null}.sortedByDescending{it.time}
  fun add(module:String,title:String){val old=p.getString("records","")?:"";p.edit().putString("records",old+"\\n"+module+"|"+title.replace("|"," ").replace("\\n"," ")+"|"+System.currentTimeMillis()).apply()}}
 `);
 write(path.join(javaDir, 'MainActivity.kt'), `package ${pkg}
@@ -137,7 +146,7 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import ${pkg}.ui.MainScreen
-class MainActivity:ComponentActivity(){override fun onCreate(s:Bundle?){super.onCreate(s);setContent{MainScreen()}}}
+class MainActivity:ComponentActivity(){override fun onCreate(savedInstanceState:Bundle?){super.onCreate(savedInstanceState);setContent{MainScreen()}}}
 `);
 write(path.join(javaDir, 'ui', 'MainScreen.kt'), `package ${pkg}.ui
 import androidx.compose.animation.AnimatedContent
@@ -153,11 +162,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import ${pkg}.AppConfig
 import ${pkg}.data.AppRepository
-@Composable fun MainScreen(){val repo=remember{AppRepository(LocalContext.current)};var page by remember{mutableStateOf("login")};var module by remember{mutableStateOf(AppConfig.modules.first())};MaterialTheme{AnimatedContent(page,label="screen"){when(it){"login"->Login({u,p->repo.login(u,p)},{page="dashboard"},{page="register"},{page="forgot"});"register"->Register({e,p->repo.register(e,p);page="login"},{page="login"});"forgot"->Forgot{page="login"};else->Dashboard(module,{module=it},repo,{page="login"})}}}}
+@Composable fun MainScreen(){val context=LocalContext.current;val repo=remember(context){AppRepository(context)};var page by remember{mutableStateOf("login")};var module by remember{mutableStateOf(AppConfig.modules.first())};MaterialTheme{AnimatedContent(page,label="screen"){when(it){"login"->Login({u,p->repo.login(u,p)},{page="dashboard"},{page="register"},{page="forgot"});"register"->Register({e,p->repo.register(e,p);page="login"},{page="login"});"forgot"->Forgot{page="login"};else->Dashboard(module,{module=it},repo,{page="login"})}}}}
 @Composable fun Login(check:(String,String)->Boolean,ok:()->Unit,register:()->Unit,forgot:()->Unit){var u by remember{mutableStateOf("")};var p by remember{mutableStateOf("")};var error by remember{mutableStateOf("")};Column(Modifier.fillMaxSize().padding(24.dp),verticalArrangement=Arrangement.Center){Text(AppConfig.APP_NAME,color=MaterialTheme.colorScheme.primary,fontWeight=FontWeight.Bold);Text("Masuk ke ruang kerja Anda",style=MaterialTheme.typography.headlineMedium);Spacer(Modifier.height(20.dp));OutlinedTextField(u,{u=it},label={Text("Username atau email")},modifier=Modifier.fillMaxWidth());OutlinedTextField(p,{p=it},label={Text("Password")},modifier=Modifier.fillMaxWidth());if(error.isNotEmpty())Text(error,color=MaterialTheme.colorScheme.error);Button({if(check(u,p))ok()else error="Login gagal. Demo: Admin / Admin123"},Modifier.fillMaxWidth().padding(top=16.dp)){Text("Masuk")};TextButton(forgot,Modifier.align(Alignment.CenterHorizontally)){Text("Lupa password?")};OutlinedButton(register,Modifier.fillMaxWidth()){Text("Buat akun baru")}}}
 @Composable fun Register(done:(String,String)->Unit,back:()->Unit){var e by remember{mutableStateOf("")};var p by remember{mutableStateOf("")};Column(Modifier.fillMaxSize().padding(24.dp),verticalArrangement=Arrangement.Center){Text("Buat akun",style=MaterialTheme.typography.headlineMedium);OutlinedTextField(e,{e=it},label={Text("Email")},modifier=Modifier.fillMaxWidth());OutlinedTextField(p,{p=it},label={Text("Password minimal 8 karakter")},modifier=Modifier.fillMaxWidth());Button({if(e.isNotBlank()&&p.length>=8)done(e,p)},Modifier.fillMaxWidth().padding(top=16.dp)){Text("Daftar")};TextButton(back){Text("Kembali masuk")}}}
 @Composable fun Forgot(back:()->Unit){Column(Modifier.fillMaxSize().padding(24.dp),verticalArrangement=Arrangement.Center){Text("Pemulihan password",style=MaterialTheme.typography.headlineMedium);Text("Untuk akun lokal, buat akun baru atau gunakan Admin / Admin123.");TextButton(back){Text("Kembali")}}}
-@Composable fun Dashboard(module:String,select:(String)->Unit,repo:AppRepository,logout:()->Unit){var input by remember{mutableStateOf("")};val data=repo.records(module);Scaffold(topBar={TopAppBar(title={Text(AppConfig.APP_NAME)},actions={TextButton(logout){Text("Keluar")}})}){pad->Column(Modifier.padding(pad).padding(16.dp)){Text(module,style=MaterialTheme.typography.headlineMedium,fontWeight=FontWeight.Bold);Text("${'$'}{data.size} data tersimpan di perangkat",color=MaterialTheme.colorScheme.primary);Spacer(Modifier.height(12.dp));LazyColumn(horizontalAlignment=Alignment.Start){item{Row{AppConfig.modules.take(4).forEach{FilterChip(it==module,{select(it)},{Text(it)},Modifier.padding(end=6.dp))}};OutlinedTextField(input,{input=it},label={Text("Tambah data $module")},modifier=Modifier.fillMaxWidth());Button({if(input.isNotBlank()){repo.add(module,input);input=""}},Modifier.fillMaxWidth()){Text("Simpan")}};items(data){Card(Modifier.fillMaxWidth().padding(top=10.dp)){Text(it.title,Modifier.padding(16.dp))}}}}}}
+@OptIn(ExperimentalMaterial3Api::class) @Composable fun Dashboard(module:String,select:(String)->Unit,repo:AppRepository,logout:()->Unit){var input by remember{mutableStateOf("")};val data=repo.records(module);Scaffold(topBar={TopAppBar(title={Text(AppConfig.APP_NAME)},actions={TextButton(logout){Text("Keluar")}})}){pad->Column(Modifier.padding(pad).padding(16.dp)){Text(module,style=MaterialTheme.typography.headlineMedium,fontWeight=FontWeight.Bold);Text("${'$'}{data.size} data tersimpan di perangkat",color=MaterialTheme.colorScheme.primary);Spacer(Modifier.height(12.dp));LazyColumn(horizontalAlignment=Alignment.Start){item{Row{AppConfig.modules.take(4).forEach{FilterChip(it==module,{select(it)},{Text(it)},Modifier.padding(end=6.dp))}};OutlinedTextField(input,{input=it},label={Text("Tambah data $module")},modifier=Modifier.fillMaxWidth());Button({if(input.isNotBlank()){repo.add(module,input);input=""}},Modifier.fillMaxWidth()){Text("Simpan")}};items(data){Card(Modifier.fillMaxWidth().padding(top=10.dp)){Text(it.title,Modifier.padding(16.dp))}}}}}}
 `);
 write(path.join(root, 'README.md'), `# ${appName} — Android Native\n\nAplikasi native Kotlin/XML yang dibuat dari proyek migrasi **${sourceArg}**.\n\n- Login demo: **Admin / Admin123**\n- Data aplikasi disimpan di SQLite lokal; modul: ${modules.join(', ')}.\n- Konfigurasi endpoint backend: \`${apiUrl || 'belum diatur'}\` di \`AppConfig.kt\`.\n- Buka folder ini (bukan subfolder) di Android Studio, tunggu Gradle sync, lalu Run.\n`);
 console.log(`Proyek Android native dibuat: ${root}`);
