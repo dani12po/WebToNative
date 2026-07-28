@@ -15,6 +15,9 @@ Gunakan dokumentasi resmi berikut saat menyiapkan lingkungan, mengembangkan hasi
 | Google Sheets | Database awal Web App GAS | [Spreadsheet service](https://developers.google.com/apps-script/guides/sheets) |
 | Next.js | Hasil migrasi web modern | [Next.js Docs](https://nextjs.org/docs) |
 | Vercel | Deployment hasil migrasi Next.js | [Vercel Documentation](https://vercel.com/docs) |
+| Midtrans Snap | Checkout pembayaran pada hasil migrasi Next.js | [Midtrans Snap Docs](https://docs.midtrans.com/docs/snap-overview) |
+| Telegram Bot API | Notifikasi transaksi Telegram | [Telegram Bot API](https://core.telegram.org/bots/api) |
+| Fonnte | Notifikasi WhatsApp opsional | [Fonnte API Docs](https://docs.fonnte.com/) |
 | Android Jetpack Compose | UI aplikasi Android native | [Android Compose](https://developer.android.com/compose) |
 | Gradle | Build debug APK Android otomatis | [Gradle User Manual](https://docs.gradle.org/current/userguide/userguide.html) |
 | Android Debug Bridge | Instalasi dan preview APK di perangkat/emulator | [ADB documentation](https://developer.android.com/tools/adb) |
@@ -45,6 +48,8 @@ Mode AI membaca konfigurasi lokal dari `api.txt`. Pilih salah satu provider yang
 - Database Google Sheets yang dibuat otomatis ketika GAS Web App pertama kali digunakan.
 - Tema AI opsional untuk memilih palet, font, landing page/login, dashboard, dan blueprint modul bisnis yang tervalidasi.
 - Migrasi GAS ke Next.js dengan landing page SaaS, SEO, API route, skema database, pemeriksaan build, dan QA AI.
+- Hasil migrasi Next.js menyertakan Midtrans Snap, webhook SHA-512 idempoten, tabel transaksi pembayaran, serta tombol bayar untuk record yang memiliki nominal.
+- Notifikasi transaksi hasil migrasi mendukung Telegram atau WhatsApp/Fonnte, dengan fallback environment dan pengaturan admin yang menyimpan token terenkripsi.
 - Generator Android native Jetpack Compose dengan login, registrasi, database lokal, modul bisnis dinamis, debug APK, serta instalasi ke perangkat Android.
 
 ## Prasyarat
@@ -149,6 +154,20 @@ Output migrasi mencakup struktur API dan skema database. Untuk produksi multi-us
 
 Tool juga memilih template lokal dari `templates/migration-designs/`. Jika tidak ada template yang sesuai, AI membuat blueprint desain tervalidasi yang dapat digunakan kembali pada migrasi berikutnya.
 
+### Pembayaran Midtrans dan notifikasi hasil migrasi
+
+Setiap migrasi baru menyiapkan Midtrans Snap sebagai gateway default. Tidak ada server key, token notifikasi, atau kredensial merchant yang dimasukkan ke source code maupun bundle browser.
+
+1. Hubungkan PostgreSQL/Vercel Postgres dan jalankan `db/schema.sql` dari folder hasil migrasi.
+2. Salin `.env.example` menjadi `.env.local` untuk pengujian lokal, atau isi nilai yang sama di **Vercel Environment Variables** untuk deployment.
+3. Isi `MIDTRANS_SERVER_KEY`, `MIDTRANS_CLIENT_KEY`, dan pilih `MIDTRANS_IS_PRODUCTION=false` untuk Sandbox terlebih dahulu.
+4. Setelah deploy, daftarkan URL webhook `https://domain-anda/api/payment/webhook` di dashboard Midtrans.
+5. Uji pembayaran Sandbox. Webhook hanya memproses payload dengan signature SHA-512 Midtrans yang valid dan pembaruan transaksi dibuat idempoten.
+
+Untuk notifikasi, gunakan `NOTIFICATION_CHANNEL=telegram` atau `whatsapp`, lalu isi token dan target pada environment sebagai fallback. Admin dapat mengganti channel, token, dan target dari menu **Pengaturan Notifikasi** tanpa mengubah kode atau redeploy. Menu tersebut membutuhkan `ADMIN_SETTINGS_TOKEN`; token provider disimpan terenkripsi dengan `NOTIFICATION_ENCRYPTION_KEY` dan hanya ditampilkan dalam bentuk tersamarkan.
+
+> `MIDTRANS_SERVER_KEY`, token Telegram/Fonnte, `NOTIFICATION_ENCRYPTION_KEY`, dan `ADMIN_SETTINGS_TOKEN` adalah rahasia. Jangan masukkan nilainya ke `NEXT_PUBLIC_*`, source code, atau repository.
+
 ## Mobile App: Android native dan APK
 
 Pilih **Mobile App**, lalu pilih hasil migrasi dari `webmigrasi/`. Tool menganalisis modul hasil migrasi dan membuat aplikasi Android native Jetpack Compose pada `apkmigrasi/<nama-proyek>-native/`. Menu seperti transaksi, produk, siswa, absensi, iuran, pembayaran, dan laporan diteruskan menjadi menu aplikasi.
@@ -216,6 +235,8 @@ Folder `project/`, `webmigrasi/`, dan `apkmigrasi/` adalah output generator dan 
 
 - Jangan commit atau bagikan `api.txt`, `authsesion.json`, atau kredensial `clasp`.
 - Ganti password Admin awal sebelum aplikasi digunakan.
+- Untuk pembayaran nyata, gunakan Midtrans Sandbox lebih dulu, aktifkan webhook HTTPS, dan pastikan `db/schema.sql` telah dijalankan sebelum mengarahkan pelanggan ke checkout.
+- Simpan semua payment key dan token notifikasi hanya sebagai environment variable deployment; jangan gunakan credential uji untuk transaksi produksi.
 - Uji dengan data non-produksi terlebih dahulu dan cadangkan Google Sheet secara berkala.
 - Untuk data sensitif, transaksi nyata, atau kebutuhan kepatuhan khusus, lakukan audit keamanan dan pengembangan tambahan sebelum dipakai produksi.
 
