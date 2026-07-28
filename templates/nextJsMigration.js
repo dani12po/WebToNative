@@ -19,7 +19,7 @@ export function getNextMigrationFiles({ projectName, profile, analysis = null, d
     '.gitignore': 'node_modules/\n.next/\n.vercel/\n.env*\n',
     'README.md': `# ${projectName} — Next.js migration\n\nMigrasi awal dari proyek Google Apps Script. UI dan modul sudah dipindahkan ke Next.js; data versi awal disimpan di browser agar proyek dapat langsung di-deploy.\n\n## Jalankan\n\n\`\`\`bash\nnpm install\nnpm run dev\n\`\`\`\n\n## Deploy Vercel\n\n\`\`\`bash\nnpx vercel --prod\n\`\`\`\n\n## Produksi\n\nUntuk data bersama, login yang aman, dan migrasi data Google Sheets, sambungkan database (misalnya Postgres/Supabase) melalui Route Handlers Next.js. Jangan menyimpan kredensial Google atau data produksi di client/browser.\n`
   };
-  return { ...files, 'app/layout.js': getEnhancedNextLayout(projectName, profile, analysis), 'app/page.js': personalizeMarketingPage(getPremiumNextPage()), 'app/globals.css': getEnhancedNextStyles(designTemplate) + getLandingPolishStyles() + getDesignTemplateStyles(designTemplate) + getMarketingLandingStyles() + getAiLandingVariantStyles(), 'lib/database.js': getDatabaseAdapter(), 'lib/payment-gateway.js': getPaymentGatewayAdapter(), 'app/api/records/route.js': getRecordsApi(), 'app/api/payments/checkout/route.js': getCheckoutApi(), 'app/api/payments/webhook/route.js': getPaymentWebhookApi(), 'db/schema.sql': getDatabaseSchema(), 'DATABASE.md': getDatabaseGuide(), 'PAYMENT_GATEWAY.md': getPaymentGatewayGuide(), '.env.example': getPaymentEnvExample(), 'MIGRATION_AUDIT.md': getMigrationAudit(projectName, profile, analysis, designTemplate) };
+  return { ...files, 'app/layout.js': getEnhancedNextLayout(projectName, profile, analysis), 'app/pwa-register.js': getPwaRegister(), 'app/page.js': personalizeMarketingPage(getPremiumNextPage()), 'app/globals.css': getEnhancedNextStyles(designTemplate) + getLandingPolishStyles() + getDesignTemplateStyles(designTemplate) + getMarketingLandingStyles() + getAiLandingVariantStyles(), 'public/manifest.webmanifest': getPwaManifest(projectName, profile, designTemplate), 'public/sw.js': getPwaServiceWorker(), 'public/icon.svg': getPwaIcon(projectName, designTemplate), 'lib/database.js': getDatabaseAdapter(), 'lib/payment-gateway.js': getPaymentGatewayAdapter(), 'app/api/records/route.js': getRecordsApi(), 'app/api/payments/checkout/route.js': getCheckoutApi(), 'app/api/payments/webhook/route.js': getPaymentWebhookApi(), 'db/schema.sql': getDatabaseSchema(), 'DATABASE.md': getDatabaseGuide(), 'PAYMENT_GATEWAY.md': getPaymentGatewayGuide(), '.env.example': getPaymentEnvExample(), 'MIGRATION_AUDIT.md': getMigrationAudit(projectName, profile, analysis, designTemplate), 'PWA.md': getPwaGuide() };
 }
 
 function getPaymentEnvExample() { return `# Pilih: manual | midtrans | xendit\nPAYMENT_PROVIDER=manual\n# Midtrans Server Key (rahasia)\nMIDTRANS_SERVER_KEY=\nMIDTRANS_IS_PRODUCTION=false\n# Xendit Secret Key dan webhook token (rahasia)\nXENDIT_SECRET_KEY=\nXENDIT_WEBHOOK_TOKEN=\nAPP_BASE_URL=https://your-app.vercel.app\n`; }
@@ -114,7 +114,33 @@ function getAiLandingVariantStyles() {
 function getEnhancedNextLayout(projectName, profile, analysis) {
   const title = String(analysis?.seoTitle || `${projectName} | ${profile.name}`).replace(/'/g, "\\'");
   const description = String(analysis?.seoDescription || profile.tagline || `Aplikasi ${profile.name} modern.`).replace(/'/g, "\\'");
-  return `import './globals.css';\n\nexport const metadata = { title: '${title}', description: '${description}', keywords: ['${profile.name.replace(/'/g, "\\'")}', 'aplikasi bisnis', 'dashboard'], robots: { index: true, follow: true }, openGraph: { title: '${title}', description: '${description}', type: 'website', locale: 'id_ID' } };\nexport const viewport = { themeColor: '#08111f' };\nexport default function RootLayout({ children }) { return <html lang="id"><body>{children}</body></html>; }\n`;
+  return `import './globals.css';\nimport PwaRegister from './pwa-register';\n\nexport const metadata = { title: '${title}', description: '${description}', manifest: '/manifest.webmanifest', keywords: ['${profile.name.replace(/'/g, "\\'")}', 'aplikasi bisnis', 'dashboard'], robots: { index: true, follow: true }, openGraph: { title: '${title}', description: '${description}', type: 'website', locale: 'id_ID' }, appleWebApp: { capable: true, statusBarStyle: 'default', title: '${title}' }, icons: { icon: '/icon.svg', apple: '/icon.svg' } };\nexport const viewport = { themeColor: '#08111f' };\nexport default function RootLayout({ children }) { return <html lang="id"><body><PwaRegister />{children}</body></html>; }\n`;
+}
+
+function getPwaRegister() {
+  return `'use client';\nimport { useEffect } from 'react';\nexport default function PwaRegister(){useEffect(()=>{if('serviceWorker'in navigator)window.addEventListener('load',()=>navigator.serviceWorker.register('/sw.js').catch(()=>{}),{once:true})},[]);return null}\n`;
+}
+
+function getPwaManifest(projectName, profile, designTemplate) {
+  const name = String(projectName || profile?.name || 'Aplikasi').slice(0, 72);
+  const shortName = name.slice(0, 24);
+  const accent = /^#[0-9a-f]{6}$/i.test(designTemplate?.accent || '') ? designTemplate.accent : '#2563eb';
+  return JSON.stringify({ name, short_name: shortName, description: `${profile?.tagline || `Aplikasi ${profile?.name || 'bisnis'} modern`}`.slice(0, 180), start_url: '/', scope: '/', display: 'standalone', background_color: '#08111f', theme_color: accent, icons: [{ src: '/icon.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'any maskable' }] }, null, 2) + '\n';
+}
+
+function getPwaIcon(projectName, designTemplate) {
+  const accent = /^#[0-9a-f]{6}$/i.test(designTemplate?.accent || '') ? designTemplate.accent : '#2563eb';
+  const accent2 = /^#[0-9a-f]{6}$/i.test(designTemplate?.accent2 || '') ? designTemplate.accent2 : '#7c3aed';
+  const initial = String(projectName || 'A').trim().charAt(0).toUpperCase().replace(/[<>&]/g, 'A');
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop stop-color="${accent}"/><stop offset="1" stop-color="${accent2}"/></linearGradient></defs><rect width="512" height="512" rx="112" fill="url(#g)"/><path d="M116 256h280M256 116v280" stroke="#fff" stroke-opacity=".22" stroke-width="24" stroke-linecap="round"/><text x="256" y="330" text-anchor="middle" fill="#fff" font-family="Arial,sans-serif" font-size="210" font-weight="700">${initial}</text></svg>`;
+}
+
+function getPwaServiceWorker() {
+  return `const CACHE='gas-migration-shell-v1';const SHELL=['/','/manifest.webmanifest','/icon.svg'];self.addEventListener('install',event=>event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(SHELL)).then(()=>self.skipWaiting())));self.addEventListener('activate',event=>event.waitUntil(self.clients.claim()));self.addEventListener('fetch',event=>{if(event.request.method!=='GET'||new URL(event.request.url).origin!==location.origin)return;event.respondWith(fetch(event.request).then(response=>{const copy=response.clone();caches.open(CACHE).then(cache=>cache.put(event.request,copy));return response}).catch(()=>caches.match(event.request).then(hit=>hit||caches.match('/'))))});\n`;
+}
+
+function getPwaGuide() {
+  return `# PWA\n\nProyek Next.js hasil migrasi ini sudah menyertakan manifest, service worker, icon, dan registrasi otomatis. Setelah deploy HTTPS (misalnya Vercel), buka URL aplikasi melalui Chrome/Edge lalu pilih **Install app**, atau melalui Safari iPhone pilih **Add to Home Screen**.\n\nService worker hanya menyimpan shell aplikasi dan aset GET same-origin. Data operasional tetap membutuhkan API/database yang aman; jangan menganggap cache browser sebagai sumber data produksi.\n`;
 }
 
 function getMigrationAudit(projectName, profile, analysis) {
