@@ -2,12 +2,21 @@
 
 Dashboard web untuk membuat dan memantau job generator. Build berat **tidak** dilakukan browser: job nantinya diambil dan dieksekusi oleh CLI WebToNative pada komputer pengguna.
 
+## Ringkasan cepat
+
+1. Konfigurasikan Supabase dan jalankan schema SQL.
+2. Salin `.env.example` ke `.env.local`.
+3. Jalankan `npm install` lalu `npm run dev`.
+4. Buat akun, hubungkan CLI, lalu buat job dari dashboard.
+
+> Dashboard adalah control center. CLI lokal tetap menjalankan `clasp`, Next.js, Gradle, dan proses deployment di komputer pengguna.
+
 ## Konfigurasi Supabase (wajib untuk akun publik)
 
 1. Buat proyek di [Supabase](https://supabase.com/), lalu pada **Authentication** aktifkan Email/Password dan konfirmasi email.
 2. Jalankan isi [supabase/schema.sql](./supabase/schema.sql) di **SQL Editor** Supabase.
 3. Salin `.env.example` menjadi `.env.local`, lalu isi nilai URL/key proyek. `SUPABASE_SERVICE_ROLE_KEY` dan `WEBTONATIVE_SECRETS_KEY` hanya boleh ada di server/deployment environment; jangan dibagikan ke browser atau Git.
-4. Untuk Vercel, masukkan keempat environment variable yang sama di **Project Settings → Environment Variables**.
+4. Untuk Vercel, gunakan folder `dashboard` sebagai **Root Directory**, lalu masukkan keempat environment variable yang sama di **Project Settings → Environment Variables**.
 
 Dashboard memakai Supabase Auth: pengguna daftar dengan **email, username, password**, lalu masuk memakai **username + password**. Email dipakai untuk verifikasi/pemulihan. Semua job, agent CLI, dan riwayat tersaring berdasarkan `user_id` akun yang sedang masuk.
 
@@ -37,7 +46,7 @@ Jika muncul error `Cannot find module './331.js'`, hentikan server dengan `Ctrl+
 3. Dari folder utama tools, jalankan perintah yang ditampilkan, misalnya:
 
    ```bash
-   npm run connect-web -- --url http://localhost:3000 --code ABCD2345
+   npm run connect-web -- --url http://localhost:3001 --code ABCD2345
    ```
 
 4. Sesi perangkat disimpan lokal pada `webtonative-agent.json` dan diabaikan Git. Metadata perangkat juga tersimpan pada akun Supabase agar job tidak tertukar antar pengguna. Agent langsung menunggu job hingga 10 menit.
@@ -48,3 +57,13 @@ Jika muncul error `Cannot find module './331.js'`, hentikan server dengan `Ctrl+
    ```
 
 Setelah Supabase dikonfigurasi, job dan pairing tidak hilang saat dashboard direstart atau dipindah ke Vercel. CLI hanya dapat mengambil job yang dibuat oleh akun pemilik perangkat tersebut.
+
+## Alur penggunaan singkat
+
+1. Pengguna membuat akun dashboard dengan username, email, dan password.
+2. Pengguna memasangkan CLI pada komputer yang akan menjalankan build.
+3. Job Web App GAS, migrasi Next.js, atau Android dibuat dari halaman **Buat aplikasi**.
+4. CLI lokal mengambil job milik akun tersebut, menjalankan tool yang dibutuhkan, lalu mengirim status kembali ke dashboard.
+5. URL deploy atau lokasi output tampil pada **Aplikasi & web saya**.
+
+Dashboard mengatur workflow dan status. Build tetap dijalankan di komputer pengguna, sehingga browser tidak menjalankan credential atau tool deployment secara langsung.

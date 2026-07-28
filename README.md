@@ -2,6 +2,18 @@
 
 CLI Node.js untuk membuat dan deploy Google Apps Script (GAS) Web App modular, memigrasikan hasilnya ke Next.js, serta menghasilkan aplikasi Android native berbasis Jetpack Compose.
 
+## Daftar isi
+
+- [Teknologi & dokumentasi resmi](#teknologi--dokumentasi-resmi)
+- [Kemampuan utama](#kemampuan-utama)
+- [Prasyarat dan instalasi](#prasyarat)
+- [Dashboard web WebToNative](#dashboard-web-webtonative)
+- [Mode tools](#mode-tools)
+- [Membuat Web App GAS](#membuat-web-app-gas)
+- [Migrasi ke Next.js](#migrasi-ke-nextjs)
+- [Mobile App Android](#mobile-app-android-native-dan-apk)
+- [Keamanan dan penggunaan produksi](#keamanan-dan-penggunaan-produksi)
+
 ## Teknologi & dokumentasi resmi
 
 Gunakan dokumentasi resmi berikut saat menyiapkan lingkungan, mengembangkan hasil generator, atau melakukan deployment produksi:
@@ -73,6 +85,61 @@ cd web-app-generator-GAS
 npm install
 npm start
 ```
+
+Setelah instalasi, gunakan `npm start` untuk membuka menu CLI. Untuk menjalankan dashboard browser, ikuti bagian [Dashboard web WebToNative](#dashboard-web-webtonative) di bawah.
+
+## Dashboard web WebToNative
+
+Selain CLI, repository ini menyediakan dashboard Next.js di folder `dashboard/`. Dashboard digunakan untuk membuat job dari browser, mengelola koneksi layanan, dan memantau hasil pekerjaan yang dijalankan oleh CLI lokal. Browser tidak menjalankan `clasp`, Next.js build, Gradle, atau deployment secara langsung.
+
+### Menjalankan dashboard secara lokal
+
+Ringkasnya: **buat proyek Supabase → jalankan schema SQL → isi `.env.local` → jalankan dashboard → pairing CLI**.
+
+1. Siapkan proyek [Supabase](https://supabase.com/) dan aktifkan **Email/Password** pada Authentication.
+2. Jalankan SQL dari [`dashboard/supabase/schema.sql`](dashboard/supabase/schema.sql) pada SQL Editor Supabase.
+3. Salin konfigurasi contoh:
+
+   ```powershell
+   Copy-Item dashboard\.env.example dashboard\.env.local
+   ```
+
+4. Isi `dashboard/.env.local`: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, dan `WEBTONATIVE_SECRETS_KEY`.
+5. Jalankan dashboard:
+
+   ```bash
+   cd dashboard
+   npm install
+   npm run dev
+   ```
+
+6. Buka [http://localhost:3001](http://localhost:3001), buat akun atau masuk, lalu gunakan menu **Hubungkan CLI** untuk memperoleh kode pairing.
+
+> `SUPABASE_SERVICE_ROLE_KEY` dan `WEBTONATIVE_SECRETS_KEY` adalah rahasia server. Jangan gunakan prefix `NEXT_PUBLIC_`, jangan commit `.env.local`, dan jangan memasukkannya ke log.
+
+### Menghubungkan dashboard ke CLI
+
+Dashboard mengatur job, sedangkan komputer pengguna tetap menjalankan build dan deployment.
+
+1. Buat kode pairing pada bagian **Hubungkan CLI** di dashboard.
+2. Di folder utama repository, jalankan perintah yang diberikan dashboard:
+
+   ```bash
+   npm run connect-web -- --url http://localhost:3001 --code KODE_ANDA
+   ```
+
+3. CLI menyimpan sesi perangkat pada `webtonative-agent.json` lokal dan otomatis menunggu job dari akun yang sama.
+4. Jika agent sudah berhenti, jalankan ulang dengan `npm run agent`.
+
+Setiap job dibatasi pada akun pemiliknya. Status proses, tautan deployment, atau pesan error dikirim kembali ke dashboard setelah pekerjaan selesai.
+
+### Deploy dashboard ke Vercel
+
+Deploy dashboard sebagai proyek Next.js terpisah dengan **Root Directory** `dashboard`. Masukkan empat environment variable yang sama seperti `.env.local`, lalu jalankan migrasi SQL Supabase terlebih dahulu. Setelah deployment, gunakan URL deployment pada pairing CLI, misalnya `--url https://dashboard-anda.vercel.app`.
+
+Credential layanan yang disimpan melalui Pengaturan dashboard dienkripsi di server. Pengguna dapat menghapus koneksi atau mengunduh backup terenkripsi, tetapi dashboard tidak menampilkan kembali nilai credential mentah.
+
+> Dashboard membutuhkan Supabase agar akun, job, pairing CLI, dan koneksi layanan tersimpan. CLI tetap harus dijalankan pada komputer pengguna karena proses build bergantung pada tool dan environment lokal.
 
 ## Mode tools
 
