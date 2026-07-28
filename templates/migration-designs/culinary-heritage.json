@@ -1,0 +1,22 @@
+{
+  "id": "culinary-heritage",
+  "name": "Culinary Heritage SaaS",
+  "match": [
+    "restoran",
+    "kafe",
+    "menu",
+    "meja",
+    "pesanan",
+    "reservasi",
+    "makanan",
+    "minuman",
+    "katering",
+    "hotel"
+  ],
+  "layout": "topbar",
+  "landing": "culinary",
+  "accent": "#8B4513",
+  "accent2": "#E67E22",
+  "description": "SaaS hospitality bernuansa heritage dengan topbar hangat, kartu menu atau layanan, dan pengalaman responsif untuk restoran serta kafe.",
+  "source": "library"
+}

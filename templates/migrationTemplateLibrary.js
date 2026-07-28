@@ -5,7 +5,7 @@ import fs from 'fs-extra';
 const DESIGN_DIRECTORY = new URL('./migration-designs/', import.meta.url);
 const REQUIRED_FIELDS = ['id', 'name', 'match', 'layout', 'landing', 'accent', 'accent2'];
 const LAYOUTS = new Set(['sidebar', 'topbar', 'rail']);
-const LANDINGS = new Set(['split', 'centered', 'editorial']);
+const LANDINGS = new Set(['split', 'centered', 'editorial', 'marketplace', 'service', 'industrial', 'culinary']);
 const HEX = /^#[0-9a-f]{6}$/i;
 
 const fallbackDesign = {

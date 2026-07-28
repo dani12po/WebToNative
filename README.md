@@ -36,6 +36,10 @@ Mode AI membaca konfigurasi lokal dari `api.txt`. Pilih salah satu provider yang
 - 54+ preset aplikasi, termasuk kasir, toko fashion, laundry, bengkel, booking, sekolah, BIMBA, klinik, inventaris, keuangan, HR, dan restoran.
 - Login, registrasi, logout, role Admin/User, pengaturan akun, dan manajemen pengguna.
 - Dashboard responsif untuk desktop, tablet, dan ponsel dengan tema terang/gelap serta layout bervariasi.
+- Tema tambahan **Learning Marketplace** untuk kursus, sekolah, BIMBA, komunitas, katalog, dan membership: navigasi topbar, kartu konten, hero premium, serta grid responsif. Tema lama tetap tersedia.
+- Tema tambahan **Service Trust** untuk klinik, salon, bengkel, properti, konsultasi, dan layanan profesional: topbar bersih, hero biru/teal, kartu layanan, CTA kontak, dan tata letak responsif. Tema lama tetap tersedia.
+- Tema tambahan **Industrial Signal** untuk bengkel, cuci kendaraan, parkir, gudang, logistik, dan operasional teknis: topbar charcoal, aksen kuning sinyal, status kerja yang tegas, dan layout responsif. Tema lama tetap tersedia.
+- Tema tambahan **Culinary Heritage** untuk restoran, kafe, hotel, katering, dan event: palet cokelat-krem-oranye, kartu menu atau layanan, dan landing hospitality yang responsif. Tema lama tetap tersedia.
 - Pengaturan harga, pembayaran, metode pembayaran, laporan, dan modul bisnis sesuai preset.
 - Database Google Sheets yang dibuat otomatis ketika GAS Web App pertama kali digunakan.
 - Tema AI opsional untuk memilih palet, font, landing page/login, dashboard, dan blueprint modul bisnis yang tervalidasi.

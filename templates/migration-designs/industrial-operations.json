@@ -1,0 +1,22 @@
+{
+  "id": "industrial-operations",
+  "name": "Industrial Operations SaaS",
+  "match": [
+    "bengkel",
+    "servis",
+    "kendaraan",
+    "cuci",
+    "parkir",
+    "gudang",
+    "stok",
+    "logistik",
+    "tiket",
+    "teknisi"
+  ],
+  "layout": "topbar",
+  "landing": "industrial",
+  "accent": "#D89B00",
+  "accent2": "#F5C518",
+  "description": "SaaS operasional teknis dengan topbar charcoal, aksen kuning sinyal, status kerja yang jelas, dan tata letak responsif.",
+  "source": "library"
+}

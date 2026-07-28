@@ -1,0 +1,22 @@
+{
+  "id": "service-trust",
+  "name": "Service Trust SaaS",
+  "match": [
+    "layanan",
+    "pelanggan",
+    "reservasi",
+    "janji",
+    "konsultasi",
+    "klinik",
+    "salon",
+    "bengkel",
+    "pembayaran",
+    "tiket"
+  ],
+  "layout": "topbar",
+  "landing": "service",
+  "accent": "#1677C8",
+  "accent2": "#15A6A2",
+  "description": "SaaS layanan profesional dengan navigasi ringan, hero terpercaya, kartu layanan, dan pengalaman mobile yang responsif.",
+  "source": "library"
+}

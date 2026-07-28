@@ -1,0 +1,22 @@
+{
+  "id": "learning-marketplace",
+  "name": "Learning Marketplace SaaS",
+  "match": [
+    "siswa",
+    "kelas",
+    "kursus",
+    "materi",
+    "pengajar",
+    "absensi",
+    "iuran",
+    "pembayaran",
+    "bimba",
+    "sekolah"
+  ],
+  "layout": "topbar",
+  "landing": "marketplace",
+  "accent": "#5B21B6",
+  "accent2": "#D946EF",
+  "description": "SaaS pendidikan dengan navigasi topbar, kartu konten, palet ungu profesional, dan landing page marketplace yang responsif.",
+  "source": "library"
+}
