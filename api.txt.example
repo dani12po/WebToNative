@@ -1,8 +1,0 @@
-# Salin file ini menjadi api.txt lalu isi nilainya. Jangan commit api.txt.
-# Provider: openai, groq, nvidia, openrouter, atau custom.
-provider=openai
-api_key=ISI_API_KEY_ANDA
-model=ISI_MODEL_ANDA
-
-# Hanya diperlukan bila provider=custom.
-# endpoint=https://provider-anda.example/v1/chat/completions

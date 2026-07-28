@@ -1,0 +1,165 @@
+{
+  "id": "laundry",
+  "name": "Laundry Management",
+  "tagline": "Kelola order, layanan, pelanggan, pembayaran, dan laporan laundry secara terpadu.",
+  "match": [
+    "laundry",
+    "order",
+    "pelanggan",
+    "pembayaran",
+    "layanan",
+    "laporan",
+    "tarif",
+    "harga",
+    "pembayaran",
+    "admin"
+  ],
+  "modules": [
+    {
+      "id": "order",
+      "name": "Order Laundry",
+      "icon": "🧺",
+      "adminOnly": true,
+      "fields": [
+        {
+          "key": "no_order",
+          "label": "No. Order",
+          "type": "text"
+        },
+        {
+          "key": "tanggal",
+          "label": "Tanggal Order",
+          "type": "date"
+        },
+        {
+          "key": "pelanggan",
+          "label": "Pelanggan",
+          "type": "text"
+        },
+        {
+          "key": "berat",
+          "label": "Berat (kg)",
+          "type": "number"
+        },
+        {
+          "key": "layanan",
+          "label": "Layanan",
+          "type": "select",
+          "options": [
+            "Cuci Ringan",
+            "Cuci Sedang",
+            "Cuci Berat",
+            "Setrika",
+            "Keringos",
+            "Jahit"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "pelanggan",
+      "name": "Data Pelanggan",
+      "icon": "👤",
+      "adminOnly": true,
+      "fields": [
+        {
+          "key": "nama",
+          "label": "Nama Pelanggan",
+          "type": "text"
+        },
+        {
+          "key": "no_hp",
+          "label": "No. HP",
+          "type": "text"
+        },
+        {
+          "key": "alamat",
+          "label": "Alamat",
+          "type": "text"
+        }
+      ]
+    },
+    {
+      "id": "tarif",
+      "name": "Tarif & Layanan",
+      "icon": "💰",
+      "adminOnly": true,
+      "fields": [
+        {
+          "key": "layanan",
+          "label": "Nama Layanan",
+          "type": "text"
+        },
+        {
+          "key": "harga",
+          "label": "Harga (Rp)",
+          "type": "number"
+        },
+        {
+          "key": "satuan",
+          "label": "Satuan",
+          "type": "select",
+          "options": [
+            "per kg",
+            "per item",
+            "per meter",
+            "paket"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "pembayaran",
+      "name": "Pembayaran",
+      "icon": "💳",
+      "adminOnly": true,
+      "fields": [
+        {
+          "key": "no_order",
+          "label": "No. Order",
+          "type": "text"
+        },
+        {
+          "key": "nominal",
+          "label": "Nominal (Rp)",
+          "type": "number"
+        },
+        {
+          "key": "metode",
+          "label": "Metode Pembayaran",
+          "type": "select",
+          "options": [
+            "Tunai",
+            "Transfer Bank",
+            "QRIS",
+            "Cash"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "laporan",
+      "name": "Laporan Harian",
+      "icon": "📊",
+      "adminOnly": true,
+      "fields": [
+        {
+          "key": "tanggal",
+          "label": "Tanggal",
+          "type": "date"
+        },
+        {
+          "key": "total_order",
+          "label": "Total Order",
+          "type": "number"
+        },
+        {
+          "key": "total_pendapatan",
+          "label": "Total Pendapatan",
+          "type": "number"
+        }
+      ]
+    }
+  ],
+  "source": "ai"
+}
