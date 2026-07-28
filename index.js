@@ -356,9 +356,19 @@ async function promptOperation() {
       { name: '1. WebApp New — buat dan deploy GAS Web App', value: 'generate' },
       { name: '2. Migrasi Project — ubah proyek GAS menjadi Next.js', value: 'migrate' },
       { name: '3. Mobile App — buat APK / iOS wrapper dari web yang sudah deploy', value: 'mobile' },
-      { name: '4. Cek Aplikasi — jalankan hasil APK wrapper di Android Emulator', value: 'check-mobile' }
+      { name: '4. Cek Aplikasi — jalankan hasil APK wrapper di Android Emulator', value: 'check-mobile' },
+      { name: '5. Web Tools — hubungkan CLI lokal ke dashboard', value: 'connect-web' }
     ]
   }]);
+}
+
+async function connectWebDashboard() {
+  const { dashboardUrl, code } = await inquirer.prompt([
+    { type: 'input', name: 'dashboardUrl', message: 'URL Web Tools (contoh http://localhost:3000):', default: 'http://localhost:3000', validate: value => /^https?:\/\//i.test(value.trim()) ? true : 'Masukkan URL HTTP atau HTTPS.' },
+    { type: 'input', name: 'code', message: 'Kode koneksi dari halaman Web Tools:', validate: value => value.trim().length >= 6 ? true : 'Kode koneksi belum valid.' }
+  ]);
+  logStep('Menghubungkan CLI lokal ke Web Tools...');
+  await execa(process.execPath, [path.join(__dirname, 'scripts', 'web-dashboard-agent.js'), '--url', dashboardUrl.trim(), '--code', code.trim()], { stdio: 'inherit' });
 }
 
 async function readGasProjectProfile(projectDir) {
@@ -1461,6 +1471,10 @@ async function main() {
   while (true) {
     try {
       const { operation } = await promptOperation();
+      if (operation === 'connect-web') {
+        await connectWebDashboard();
+        continue;
+      }
       if (operation === 'migrate') {
         await runNextMigration();
         continue;
@@ -1535,4 +1549,34 @@ async function main() {
   }
 }
 
-main();
+async function runWebGasJob(job) {
+  const displayName = String(job.name || '').trim();
+  const folderName = displayName.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-_]/g, '');
+  if (!displayName || !folderName) throw new Error('Nama job dari Web Tools tidak valid.');
+  if (!await ensureClaspAvailable()) throw new Error('clasp belum tersedia pada komputer agent.');
+  if (!await getClaspSession()) throw new Error('Agent belum login clasp. Jalankan npm start sekali dan selesaikan login Google.');
+  const projectDir = path.join(PROJECT_CONTAINER_DIR, folderName);
+  if (await fs.pathExists(projectDir)) throw new Error(`Folder project/${folderName} sudah ada. Ganti nama job atau hapus proyek lama secara manual.`);
+  const templateMap = { retail: 'cashier', service: 'booking', education: 'education' };
+  const profile = getProjectProfile(templateMap[job.options?.template] || 'attendance');
+  const visualTheme = getRandomVisualTheme(profile.id);
+  await fs.ensureDir(projectDir);
+  logStep(`Web Tools Agent menjalankan job GAS: ${displayName}`);
+  await runClaspCreate(projectDir, displayName);
+  await generateProjectFiles(projectDir, displayName, profile, visualTheme);
+  await runGasPushWithAiRepair(projectDir);
+  const deploymentId = await runClaspDeploy(projectDir, displayName);
+  await printSuccessMessage(projectDir, displayName, deploymentId);
+}
+
+async function runWebJob() {
+  const job = JSON.parse(process.env.WEBTONATIVE_JOB || '{}');
+  if (job.flow !== 'gas') throw new Error(`Executor otomatis untuk alur ${job.flow || 'tidak dikenal'} belum tersedia.`);
+  await runWebGasJob(job);
+}
+
+if (process.env.WEBTONATIVE_JOB) {
+  runWebJob().catch(error => { logError(error.message || 'Job Web Tools gagal.'); process.exitCode = 1; });
+} else {
+  main();
+}

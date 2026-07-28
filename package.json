@@ -8,7 +8,10 @@
     "gas-generate": "./index.js"
   },
   "scripts": {
-    "start": "node index.js"
+    "start": "node index.js",
+    "connect-web": "node scripts/web-dashboard-agent.js",
+    "agent": "node scripts/web-dashboard-agent.js wait",
+    "agen": "node scripts/web-dashboard-agent.js wait"
   },
   "dependencies": {
     "chalk": "^5.3.0",

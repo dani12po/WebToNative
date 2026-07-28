@@ -1,0 +1,36 @@
+/* Desktop control bar: brand left, primary navigation centered, actions right. */
+@media (min-width: 901px) {
+  .app-shell { display: block; }
+  .sidebar { position: sticky; top: 0; z-index: 30; width: 100%; height: 4.6rem; padding: 0 2rem; display: flex; flex-direction: row; align-items: center; gap: 1rem; border-right: 0; border-bottom: 1px solid var(--line); background: color-mix(in srgb, var(--bg) 92%, transparent); backdrop-filter: blur(16px); }
+  .sidebar nav { position: absolute; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: .15rem; margin: 0; }
+  .sidebar nav a { padding: .55rem .72rem; white-space: nowrap; }
+  .sidebar .connection { order: 2; margin: 0 0 0 auto; padding: 0; border: 0; border-radius: 0; background: transparent; white-space: nowrap; }
+  .sidebar .connection a { display: none; }
+  .sidebar-actions { order: 3; display: flex; margin: 0; gap: .45rem; }
+  .theme-button, .logout-button { width: auto; white-space: nowrap; padding: .55rem .7rem; }
+  .workspace { width: min(100%, 84rem); padding-top: 3.25rem; }
+}
+
+@media (max-width: 900px) {
+  .app-shell { display: block; }
+  .sidebar { position: sticky; top: 0; z-index: 30; width: 100%; height: auto; min-height: 4.2rem; padding: .8rem 1rem; display: flex; flex-wrap: wrap; flex-direction: row; align-items: center; border-right: 0; border-bottom: 1px solid var(--line); }
+  .sidebar nav { order: 3; width: 100%; margin: .75rem 0 0; display: flex; overflow-x: auto; }
+  .sidebar nav a { white-space: nowrap; }
+  .sidebar .connection { display: none; }
+  .sidebar-actions { display: flex; margin: 0 0 0 auto; gap: .4rem; }
+  .theme-button, .logout-button { font-size: .78rem; padding: .5rem .6rem; }
+  .workspace { padding-top: 1.75rem; }
+}
+
+/* Compact application typography instead of landing-page scale. */
+.workspace header h1 { font-size: clamp(1.85rem, 3vw, 2.55rem); line-height: 1.15; letter-spacing: -.035em; }
+.workspace header p { font-size: .96rem; }
+.metrics b { font-size: 1.8rem; }
+.metrics article { padding: 1.1rem; }
+.panel h2 { font-size: 1.18rem; }
+.connect-card h2 { font-size: 1.15rem; }
+.connect-card { padding: 1.25rem; }
+.connect-card > p, .connect-steps { font-size: .9rem; }
+.pairing > b { font-size: 1.55rem; letter-spacing: .1em; }
+.pairing code { font-size: .8rem; }
+.pairing-actions .primary, .pairing-actions .outline { font-size: .85rem; }

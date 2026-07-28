@@ -5,5 +5,11 @@ apkmigrasi/
 .clasprc.json
 authsesion.json
 vercel-session.json
+webtonative-agent.json
+dashboard/.env
+dashboard/.env.local
+dashboard/.next/
+dashboard/.next-production/
+dashboard/node_modules/
 api.txt
 *.log

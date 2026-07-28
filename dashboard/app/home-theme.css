@@ -1,0 +1,1 @@
+.landing-theme{width:2.5rem;padding:0;border:1px solid var(--line);border-radius:.55rem;background:transparent;color:var(--text);font-size:1rem;cursor:pointer;transition:background .2s ease,transform .2s ease}.landing-theme:hover{background:#ffffff0d;transform:translateY(-1px)}html[data-theme='light'] .landing-theme:hover{background:#e8f2ed}
