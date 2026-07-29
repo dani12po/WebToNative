@@ -1,0 +1,39 @@
+/* Aksen status harus tetap terbaca pada dua mode warna. */
+body,
+.connect-card,
+.connect-card .eyebrow,
+.connect-card h2,
+.pairing > b,
+.connection,
+.theme-icon-button,
+.gear-button {
+  transition: color .28s ease, background-color .28s ease, border-color .28s ease;
+}
+
+/* Hijau default untuk mode gelap. */
+html:not([data-theme='light']) .connect-card .eyebrow,
+html:not([data-theme='light']) .connect-card h2,
+html:not([data-theme='light']) .pairing > b {
+  color: #79e1aa;
+}
+
+/* Hijau terang tidak memiliki kontras cukup di atas latar putih. */
+html[data-theme='light'] .connect-card .eyebrow,
+html[data-theme='light'] .connect-card h2,
+html[data-theme='light'] .pairing > b {
+  color: #087443;
+}
+
+html[data-theme='light'] .connection,
+html[data-theme='light'] .connection.connected {
+  color: #176844;
+}
+
+html[data-theme='light'] .connection .status-dot {
+  background: #169b5b;
+}
+
+html[data-theme='light'] .theme-icon-button,
+html[data-theme='light'] .gear-button {
+  color: #185d42;
+}

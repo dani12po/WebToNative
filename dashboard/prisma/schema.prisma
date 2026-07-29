@@ -1,0 +1,38 @@
+// Prisma representation of dashboard/supabase/vault-schema.sql.
+// Supabase Auth's auth.users is not represented here; userId is kept as UUID
+// and its foreign key is created by the SQL migration.
+generator client { provider = "prisma-client-js" }
+datasource db { provider = "postgresql"; url = env("DATABASE_URL") }
+
+model UserVault {
+  id                 String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId             String     @unique @map("user_id") @db.Uuid
+  ciphertext         String     @db.Text
+  salt               String     @db.VarChar(128)
+  iv                 String     @db.VarChar(64)
+  recoveryKeyHash    String?    @map("recovery_key_hash") @db.Char(64)
+  encryptionMetadata Json       @default("{}") @map("encryption_metadata")
+  createdAt          DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt          DateTime   @updatedAt @map("updated_at") @db.Timestamptz(6)
+  logs               VaultLog[]
+
+  @@map("user_vaults")
+  @@index([updatedAt])
+}
+
+model VaultLog {
+  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  vaultId       String    @map("vault_id") @db.Uuid
+  userId        String    @map("user_id") @db.Uuid
+  actionType    String    @map("action_type") @db.VarChar(32)
+  userAgent     String    @map("user_agent") @db.VarChar(300)
+  ipAddressHash String    @map("ip_address_hash") @db.Char(64)
+  countryCode   String?   @map("country_code") @db.VarChar(8)
+  regionCode    String?   @map("region_code") @db.VarChar(16)
+  accessedAt    DateTime  @default(now()) @map("accessed_at") @db.Timestamptz(6)
+  vault         UserVault @relation(fields: [vaultId], references: [id], onDelete: Cascade)
+
+  @@map("vault_logs")
+  @@index([vaultId, accessedAt(sort: Desc)])
+  @@index([userId, accessedAt(sort: Desc)])
+}

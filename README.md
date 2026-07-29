@@ -8,6 +8,7 @@ CLI Node.js untuk membuat dan deploy Google Apps Script (GAS) Web App modular, m
 - [Kemampuan utama](#kemampuan-utama)
 - [Prasyarat dan instalasi](#prasyarat)
 - [Dashboard web WebToNative](#dashboard-web-webtonative)
+- [Brankas perangkat E2EE](#brankas-perangkat-e2ee)
 - [Mode tools](#mode-tools)
 - [Membuat Web App GAS](#membuat-web-app-gas)
 - [Migrasi ke Next.js](#migrasi-ke-nextjs)
@@ -27,6 +28,7 @@ Gunakan dokumentasi resmi berikut saat menyiapkan lingkungan, mengembangkan hasi
 | Google Sheets | Database awal Web App GAS | [Spreadsheet service](https://developers.google.com/apps-script/guides/sheets) |
 | Next.js | Hasil migrasi web modern | [Next.js Docs](https://nextjs.org/docs) |
 | Vercel | Deployment hasil migrasi Next.js | [Vercel Documentation](https://vercel.com/docs) |
+| Supabase | Akun dashboard, antrean job, dan metadata koneksi | [Supabase Docs](https://supabase.com/docs) |
 | Midtrans Snap | Checkout pembayaran pada hasil migrasi Next.js | [Midtrans Snap Docs](https://docs.midtrans.com/docs/snap-overview) |
 | Telegram Bot API | Notifikasi transaksi Telegram | [Telegram Bot API](https://core.telegram.org/bots/api) |
 | Fonnte | Notifikasi WhatsApp opsional | [Fonnte API Docs](https://docs.fonnte.com/) |
@@ -63,6 +65,8 @@ Mode AI membaca konfigurasi lokal dari `api.txt`. Pilih salah satu provider yang
 - Hasil migrasi Next.js menyertakan Midtrans Snap, webhook SHA-512 idempoten, tabel transaksi pembayaran, serta tombol bayar untuk record yang memiliki nominal.
 - Notifikasi transaksi hasil migrasi mendukung Telegram atau WhatsApp/Fonnte, dengan fallback environment dan pengaturan admin yang menyimpan token terenkripsi.
 - Generator Android native Jetpack Compose dengan login, registrasi, database lokal, modul bisnis dinamis, debug APK, serta instalasi ke perangkat Android.
+- Dashboard WebToNative untuk membuat job dari browser, memasangkan agent lokal, dan memantau log, lokasi output, URL Web App, URL editor GAS, serta URL deployment Next.js.
+- Brankas perangkat E2EE untuk API key AI dan konfigurasi proyek non-OAuth lintas komputer, dengan Master Password, Recovery Key, AES-GCM 256-bit, dan PBKDF2 di browser/CLI.
 
 ## Prasyarat
 
@@ -121,25 +125,61 @@ Ringkasnya: **buat proyek Supabase → jalankan schema SQL → isi `.env.local` 
 
 Dashboard mengatur job, sedangkan komputer pengguna tetap menjalankan build dan deployment.
 
-1. Buat kode pairing pada bagian **Hubungkan CLI** di dashboard.
-2. Di folder utama repository, jalankan perintah yang diberikan dashboard:
+1. Buat kode pairing pada menu **Buat aplikasi** di dashboard.
+2. Jika belum memiliki agent, klik kolom perintah pairing. Dashboard menyediakan satu perintah PowerShell yang mengunduh agent, memverifikasi checksum SHA-256, lalu memasangkannya di folder pilihan.
 
-   ```bash
-   npm run connect-web -- --url http://localhost:3001 --code KODE_ANDA
+   ```powershell
+   .\WebToNative-Agent.cmd
    ```
 
-3. CLI menyimpan sesi perangkat pada `webtonative-agent.json` lokal dan otomatis menunggu job dari akun yang sama.
-4. Jika agent sudah berhenti, jalankan ulang dengan `npm run agent`.
+3. Agent menyimpan sesi perangkat pada `webtonative-agent.json` lokal dan otomatis menunggu job dari akun yang sama selama maksimal 10 menit. Setelah itu, jalankan ulang `WebToNative-Agent.cmd` saat siap menerima job lagi.
+4. Untuk komputer baru, lakukan pairing dan login resmi layanan sekali. Setelah sinkronisasi vault berhasil, konfigurasi non-OAuth yang terenkripsi dapat dibuka lokal memakai Master Password.
 
 Setiap job dibatasi pada akun pemiliknya. Status proses, tautan deployment, atau pesan error dikirim kembali ke dashboard setelah pekerjaan selesai.
 
+> Pengguna tidak perlu clone repository core atau memasang `package.json`. Binary agent membawa runtime yang diperlukan dan tidak menyalin folder source generator ke komputer pengguna.
+
+### Layanan yang harus dihubungkan
+
+Sebelum membuat job, dashboard memeriksa layanan yang diperlukan:
+
+- **Web App GAS** membutuhkan Google Apps Script yang sudah aktif dan login `clasp` pada perangkat agent.
+- **Migrasi Next.js** membutuhkan sumber proyek GAS yang valid. Deployment Vercel memerlukan login Vercel lokal pada perangkat agent.
+- **Android native** membutuhkan path hasil migrasi Next.js. Java dan Android SDK dapat dideteksi atau dipasang otomatis oleh agent.
+- **Analisis AI** hanya dapat dipilih setelah API key AI tersedia pada brankas perangkat yang telah dibuka.
+
+Tombol login Google Apps Script dan Vercel di menu **Pengaturan** mengirim job ke agent. Browser otorisasi resmi dibuka di komputer agent; dashboard tidak menerima password akun maupun token OAuth mentah.
+
+### Membangun dan mendistribusikan WebToNative Agent (administrator)
+
+Repository core bersifat private. Administrator membangun binary Windows dari repository ini:
+
+```bash
+npm install
+npm run build:agent
+```
+
+Hasilnya berada pada `dist/agent/WebToNative-Agent-win-x64.exe`. Workflow GitHub Actions **Build WebToNative Agent** juga dapat dijalankan manual dan menghasilkan artifact Windows. Unggah artifact tersebut ke storage publik/CDN yang terpisah dari repository core, lalu isi `NEXT_PUBLIC_WEBTONATIVE_AGENT_URL` dan `NEXT_PUBLIC_WEBTONATIVE_AGENT_SHA256` pada environment dashboard. Dashboard memakai SHA-256 untuk memverifikasi binary sebelum menjalankannya otomatis dari PowerShell.
+
 ### Deploy dashboard ke Vercel
 
-Deploy dashboard sebagai proyek Next.js terpisah dengan **Root Directory** `dashboard`. Masukkan empat environment variable yang sama seperti `.env.local`, lalu jalankan migrasi SQL Supabase terlebih dahulu. Setelah deployment, gunakan URL deployment pada pairing CLI, misalnya `--url https://dashboard-anda.vercel.app`.
+Deploy dashboard sebagai proyek Next.js terpisah dengan **Root Directory** `dashboard`. Masukkan environment variable yang sama seperti `.env.local`, termasuk `NEXT_PUBLIC_WEBTONATIVE_AGENT_URL`, lalu jalankan migrasi SQL Supabase terlebih dahulu. Setelah deployment, gunakan URL deployment pada pairing CLI, misalnya `--url https://dashboard-anda.vercel.app`.
 
-Credential layanan yang disimpan melalui Pengaturan dashboard dienkripsi di server. Pengguna dapat menghapus koneksi atau mengunduh backup terenkripsi, tetapi dashboard tidak menampilkan kembali nilai credential mentah.
+Koneksi Google Apps Script dan Vercel dicatat sebagai status perangkat, bukan token OAuth yang dipindahkan antar-komputer. Pengguna dapat menghapus koneksi atau mengunduh backup terenkripsi konfigurasi yang tersedia. Pada Pengaturan akun, username bersifat permanen, sedangkan email login dapat diperbarui melalui konfirmasi Supabase dan password dapat diganti kapan saja. Setelah memperbarui dashboard, jalankan migrasi SQL pada [`dashboard/supabase/migrations`](dashboard/supabase/migrations) dan [`dashboard/supabase/vault-schema.sql`](dashboard/supabase/vault-schema.sql).
 
 > Dashboard membutuhkan Supabase agar akun, job, pairing CLI, dan koneksi layanan tersimpan. CLI tetap harus dijalankan pada komputer pengguna karena proses build bergantung pada tool dan environment lokal.
+
+## Brankas perangkat E2EE
+
+Brankas perangkat menyinkronkan **API key AI dan konfigurasi proyek non-OAuth** lintas komputer tanpa mengirim nilai mentah ke server. Ini bukan pengganti login OAuth Google atau Vercel: setiap komputer tetap harus melakukan otorisasi resmi vendor sendiri.
+
+1. Saat setup, pengguna membuat Master Password minimal 8 karakter yang memuat huruf besar, angka, dan simbol.
+2. Browser membuat Recovery Key, lalu pengguna wajib menyalin atau mengunduhnya. Server hanya menyimpan hash Recovery Key.
+3. Browser mengenkripsi payload dengan Web Crypto API: AES-GCM 256-bit. Kunci dibuat lokal dari Master Password dengan PBKDF2 dan salt unik.
+4. Dashboard/Supabase hanya menyimpan ciphertext, salt, IV, dan metadata akses. Nilai asli tidak ditampilkan kembali oleh server.
+5. Di perangkat baru, pengguna login ke dashboard, memasukkan Master Password sekali untuk membuka vault lokal, kemudian agent dapat menyinkronkan konfigurasi terenkripsi yang dibutuhkan.
+
+Jika Master Password hilang, Recovery Key hanya dapat memvalidasi permintaan reset. Data lama tidak dapat didekripsi ulang tanpa Master Password lama; pengguna harus menghapus vault lama dan membuat vault baru. Simpan Recovery Key secara offline di tempat aman.
 
 ## Mode tools
 
@@ -300,7 +340,10 @@ Folder `project/`, `webmigrasi/`, dan `apkmigrasi/` adalah output generator dan 
 
 ## Keamanan dan penggunaan produksi
 
-- Jangan commit atau bagikan `api.txt`, `authsesion.json`, atau kredensial `clasp`.
+- Jangan commit atau bagikan `api.txt`, `authsesion.json`, `vercelsession.json`, `webtonative-agent.json`, atau kredensial `clasp`.
+- Token sesi OAuth Google/Vercel tidak disalin melalui dashboard atau vault. Login vendor resmi dilakukan per perangkat.
+- Master Password dan Recovery Key tidak dikirim sebagai teks asli ke server. Kehilangan keduanya berarti data vault yang lama tidak dapat dipulihkan.
+- Endpoint vault membatasi payload, memvalidasi skema, menerapkan rate limit, dan mencatat metadata aktivitas perangkat. Terapkan RLS Supabase sebelum dashboard dipublikasikan.
 - Ganti password Admin awal sebelum aplikasi digunakan.
 - Untuk pembayaran nyata, gunakan Midtrans Sandbox lebih dulu, aktifkan webhook HTTPS, dan pastikan `db/schema.sql` telah dijalankan sebelum mengarahkan pelanggan ke checkout.
 - Simpan semua payment key dan token notifikasi hanya sebagai environment variable deployment; jangan gunakan credential uji untuk transaksi produksi.

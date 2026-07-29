@@ -12,11 +12,11 @@ export function adminClient() {
 }
 
 export async function requireUser(request) {
-  if (!isSupabaseConfigured) throw new Error('Supabase belum dikonfigurasi.');
+  if (!isSupabaseConfigured) { const error = new Error('Supabase belum dikonfigurasi.'); error.status = 503; throw error; }
   const token = request.headers.get('authorization')?.replace(/^Bearer\s+/i, '');
-  if (!token) throw new Error('Silakan masuk terlebih dahulu.');
+  if (!token) { const error = new Error('Silakan masuk terlebih dahulu.'); error.status = 401; throw error; }
   const client = createClient(url, anonKey, { auth: { persistSession: false, autoRefreshToken: false } });
   const { data, error } = await client.auth.getUser(token);
-  if (error || !data.user) throw new Error('Sesi masuk tidak valid. Silakan masuk kembali.');
+  if (error || !data.user) { const authError = new Error('Sesi masuk tidak valid. Silakan masuk kembali.'); authError.status = 401; throw authError; }
   return data.user;
 }

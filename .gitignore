@@ -13,3 +13,4 @@ dashboard/.next-production/
 dashboard/node_modules/
 api.txt
 *.log
+dist/

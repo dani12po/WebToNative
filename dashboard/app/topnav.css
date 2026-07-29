@@ -34,3 +34,53 @@
 .pairing > b { font-size: 1.55rem; letter-spacing: .1em; }
 .pairing code { font-size: .8rem; }
 .pairing-actions .primary, .pairing-actions .outline { font-size: .85rem; }
+
+/* Compact workspace density for configuration and CLI controls. */
+.workspace { width: min(100%, 72rem); padding-top: 2.2rem; padding-bottom: 2.5rem; }
+.workspace header { margin-bottom: 1.45rem; }
+.workspace header h1 { font-size: clamp(1.55rem, 2.5vw, 2.15rem); margin: .25rem 0 .45rem; }
+.workspace header p { font-size: .88rem; }
+.panel { padding: 1.1rem; }
+.panel h2 { margin: .2rem 0 .75rem; font-size: 1.05rem; }
+.page-form label { margin: .65rem 0; font-size: .8rem; }
+.page-form input, .page-form select { margin-top: .32rem; padding: .62rem .7rem; font-size: .88rem; }
+.page-form .primary { margin-top: .75rem; padding: .72rem .85rem; }
+.connect-section { margin-top: .75rem; }
+.create-layout { display: grid; grid-template-columns: minmax(0, 1.18fr) minmax(19rem, .82fr); gap: 1rem; align-items: start; }
+.create-layout .connect-section { margin-top: 0; }
+.create-requirement { margin: .75rem 0 0; padding: .6rem .72rem; border: 1px solid color-mix(in srgb, var(--line) 76%, var(--accent)); border-radius: .55rem; color: var(--muted); font-size: .8rem; line-height: 1.45; }
+.create-requirement a { color: var(--accent); font-weight: 650; }
+.page-form .primary:disabled { cursor: not-allowed; opacity: .48; filter: saturate(.55); }
+@media (max-width: 900px) { .create-layout { grid-template-columns: 1fr; } .create-layout .connect-section { margin-top: .75rem; } }
+.connect-card { padding: 1rem; }
+.connect-card h2 { margin: .2rem 0 .4rem; font-size: 1rem; }
+.connect-card > p { margin: 0; font-size: .84rem; }
+.pairing > b { margin-top: .75rem; font-size: 1.2rem; }
+.pairing code { margin-top: .45rem; padding: .65rem .75rem; font-size: .72rem; }
+.pairing-actions { margin-top: .55rem; }
+
+/* Settings text hierarchy: compact labels, readable helper copy. */
+.settings-wrap { margin-top: .25rem; padding-top: 1.25rem; }
+.settings-heading { margin-bottom: .8rem; }
+.settings-heading h2 { margin: .2rem 0 .35rem; font-size: 1.28rem; letter-spacing: -.03em; }
+.settings-heading p { font-size: .86rem; }
+.settings-grid h3, .connections h3 { margin: .2rem 0 .45rem; font-size: 1rem; }
+.settings-wrap .settings-heading { display: none; }
+.settings-wrap .settings-grid .eyebrow,
+.settings-wrap .connections .eyebrow { display: none; }
+.settings-grid .muted, .connections .muted { font-size: .86rem; line-height: 1.55; }
+.settings-grid label { font-size: .8rem; margin: .7rem 0; }
+
+/* Tipografi produk: tegas hanya pada heading dan aksi utama. */
+body { font-weight: 400; }
+.workspace header h1 { font-weight: 650; }
+.eyebrow { font-weight: 750; }
+.panel h2, .panel h3, .settings-grid h3, .connections h3 { font-weight: 650; }
+label { font-weight: 600; }
+input, select { font-weight: 500; }
+input::placeholder { font-weight: 400; }
+button, .outline { font-weight: 600; }
+.primary { font-weight: 700; }
+.chip, .job-status { font-weight: 650; }
+.job b, .stored-connection b, .pairing-code b { font-weight: 650; }
+nav a, .connection a { font-weight: 600; }

@@ -8,6 +8,12 @@ import './preview-theme-transition.css';
 import './landing-details.css';
 import './auth-modal.css';
 import './account-menu.css';
+import './apps-empty-state.css';
+import './accent-contrast.css';
+import './docs.css';
+import './service-settings.css';
+import './vault-gate.css';
+import './build-history.css';
 
 export const metadata = {
   title: 'WebToNative Control Center',

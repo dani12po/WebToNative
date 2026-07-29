@@ -2,7 +2,13 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import fs from 'fs-extra';
 
-const DESIGN_DIRECTORY = new URL('./migration-designs/', import.meta.url);
+function getDesignDirectory() {
+  // SEA agent dibundel menjadi CommonJS sehingga import.meta.url tidak ada.
+  // Pada kondisi itu template lokal bersifat opsional dan disimpan di workspace
+  // pengguna, bukan membuat URL kosong yang menyebabkan "Invalid URL".
+  if (import.meta.url) return fileURLToPath(new URL('./migration-designs/', import.meta.url));
+  return path.join(process.env.WEBTONATIVE_TEMPLATE_ROOT || process.cwd(), 'migration-designs');
+}
 const REQUIRED_FIELDS = ['id', 'name', 'match', 'layout', 'landing', 'accent', 'accent2'];
 const LAYOUTS = new Set(['sidebar', 'topbar', 'rail']);
 const LANDINGS = new Set(['split', 'centered', 'editorial', 'marketplace', 'service', 'industrial', 'culinary']);
@@ -42,7 +48,7 @@ export function normalizeMigrationDesign(value) {
 }
 
 async function readDesigns() {
-  const directory = fileURLToPath(DESIGN_DIRECTORY);
+  const directory = getDesignDirectory();
   await fs.ensureDir(directory);
   const entries = await fs.readdir(directory, { withFileTypes: true });
   const designs = [];
@@ -80,7 +86,7 @@ export async function findBestMigrationTemplate(profile, analysis) {
 export async function saveMigrationTemplate(design) {
   const normalized = normalizeMigrationDesign({ ...design, source: 'ai' });
   if (!normalized) throw new Error('Blueprint template AI tidak valid.');
-  const directory = fileURLToPath(DESIGN_DIRECTORY);
+  const directory = getDesignDirectory();
   await fs.ensureDir(directory);
   const filename = `${normalized.id}.json`;
   const target = path.join(directory, filename);

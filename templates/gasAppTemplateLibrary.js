@@ -2,7 +2,10 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import fs from 'fs-extra';
 
-const DIRECTORY = new URL('./gas-app-blueprints/', import.meta.url);
+function getDirectory() {
+  if (import.meta.url) return fileURLToPath(new URL('./gas-app-blueprints/', import.meta.url));
+  return path.join(process.env.WEBTONATIVE_TEMPLATE_ROOT || process.cwd(), 'gas-app-blueprints');
+}
 const TYPES = new Set(['text', 'number', 'date', 'datetime-local', 'month', 'select']);
 
 const normalize = value => String(value || '').toLocaleLowerCase('id-ID').replace(/[^a-z0-9]+/g, ' ').trim();
@@ -37,7 +40,7 @@ export function normalizeGasBlueprint(value) {
 }
 
 async function loadBlueprints() {
-  const directory = fileURLToPath(DIRECTORY);
+  const directory = getDirectory();
   await fs.ensureDir(directory);
   const entries = await fs.readdir(directory, { withFileTypes: true });
   const items = [];
@@ -65,7 +68,7 @@ export async function findGasBlueprint(projectName, profile) {
 export async function saveGasBlueprint(blueprint) {
   const normalized = normalizeGasBlueprint(blueprint);
   if (!normalized) throw new Error('Blueprint kebutuhan aplikasi dari AI tidak valid.');
-  const directory = fileURLToPath(DIRECTORY);
+  const directory = getDirectory();
   await fs.ensureDir(directory);
   const file = path.join(directory, `${normalized.id}.json`);
   await fs.writeFile(file, `${JSON.stringify(normalized, null, 2)}\n`, 'utf8');

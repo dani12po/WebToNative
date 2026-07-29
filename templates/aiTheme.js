@@ -1,5 +1,6 @@
 import inquirer from 'inquirer';
 import fs from 'node:fs/promises';
+import path from 'node:path';
 
 const PROVIDERS = {
   openai: { name: 'OpenAI', endpoint: 'https://api.openai.com/v1/chat/completions' },
@@ -7,6 +8,16 @@ const PROVIDERS = {
   nvidia: { name: 'NVIDIA NIM', endpoint: 'https://integrate.api.nvidia.com/v1/chat/completions' },
   openrouter: { name: 'OpenRouter', endpoint: 'https://openrouter.ai/api/v1/chat/completions' }
 };
+
+// Agent WebToNative dapat menyediakan konfigurasi AI sementara melalui file
+// di folder temp. Dengan begitu API key dari vault E2EE tidak pernah perlu
+// ditulis permanen ke workspace pengguna. CLI biasa tetap kompatibel dengan
+// api.txt di root proyek generator.
+function getAiConfigPath() {
+  if (process.env.WEBTONATIVE_AI_CONFIG_PATH) return process.env.WEBTONATIVE_AI_CONFIG_PATH;
+  if (import.meta.url) return new URL('../api.txt', import.meta.url);
+  return path.join(process.cwd(), 'api.txt');
+}
 
 function extractJson(text) {
   const source = String(text || '').replace(/```json|```/gi, '').trim();
@@ -61,7 +72,7 @@ function validateTheme(raw, fallback) {
 export async function promptAndGenerateAiTheme(projectName, profile, fallbackTheme) {
   const { enabled } = await inquirer.prompt([{ type: 'confirm', name: 'enabled', message: 'Gunakan AI untuk membuat tema visual proyek ini?', default: false }]);
   if (!enabled) return { theme: fallbackTheme, used: false };
-  const configPath = new URL('../api.txt', import.meta.url);
+  const configPath = getAiConfigPath();
   let text;
   try { text = await fs.readFile(configPath, 'utf8'); } catch (err) { throw new Error('File api.txt tidak ditemukan. Salin api.txt.example lalu isi provider, api_key, dan model.'); }
   const config = Object.fromEntries(text.split(/\r?\n/).map(line => line.trim()).filter(line => line && !line.startsWith('#')).map(line => { const index = line.indexOf('='); return index === -1 ? ['', ''] : [line.slice(0, index).trim().toLowerCase(), line.slice(index + 1).trim()]; }).filter(([key]) => key));
@@ -85,7 +96,7 @@ export async function promptAndGenerateAiTheme(projectName, profile, fallbackThe
 }
 
 export async function analyzeMigrationBuildError(errorText) {
-  const configPath = new URL('../api.txt', import.meta.url);
+  const configPath = getAiConfigPath();
   let text;
   try { text = await fs.readFile(configPath, 'utf8'); } catch { return null; }
   const config = Object.fromEntries(text.split(/\r?\n/).map(line => line.trim()).filter(line => line && !line.startsWith('#')).map(line => { const index = line.indexOf('='); return index === -1 ? ['', ''] : [line.slice(0, index).trim().toLowerCase(), line.slice(index + 1).trim()]; }).filter(([key]) => key));
@@ -100,7 +111,7 @@ export async function analyzeMigrationBuildError(errorText) {
 }
 
 export async function analyzeGasMigrationProject(projectName, profile) {
-  const configPath = new URL('../api.txt', import.meta.url);
+  const configPath = getAiConfigPath();
   let text;
   try { text = await fs.readFile(configPath, 'utf8'); } catch { return null; }
   const config = Object.fromEntries(text.split(/\r?\n/).map(line => line.trim()).filter(line => line && !line.startsWith('#')).map(line => { const index = line.indexOf('='); return index === -1 ? ['', ''] : [line.slice(0, index).trim().toLowerCase(), line.slice(index + 1).trim()]; }).filter(([key]) => key));
@@ -117,7 +128,7 @@ export async function analyzeGasMigrationProject(projectName, profile) {
 }
 
 export async function createMigrationTemplateBlueprint(projectName, profile, analysis) {
-  const configPath = new URL('../api.txt', import.meta.url);
+  const configPath = getAiConfigPath();
   let text;
   try { text = await fs.readFile(configPath, 'utf8'); } catch { return null; }
   const config = Object.fromEntries(text.split(/\r?\n/).map(line => line.trim()).filter(line => line && !line.startsWith('#')).map(line => { const index = line.indexOf('='); return index === -1 ? ['', ''] : [line.slice(0, index).trim().toLowerCase(), line.slice(index + 1).trim()]; }).filter(([key]) => key));
@@ -133,7 +144,7 @@ export async function createMigrationTemplateBlueprint(projectName, profile, ana
 }
 
 export async function analyzeGasAppRequirements(projectName, profile) {
-  const configPath = new URL('../api.txt', import.meta.url);
+  const configPath = getAiConfigPath();
   let text;
   try { text = await fs.readFile(configPath, 'utf8'); } catch { return null; }
   const config = Object.fromEntries(text.split(/\r?\n/).map(line => line.trim()).filter(line => line && !line.startsWith('#')).map(line => { const index = line.indexOf('='); return index === -1 ? ['', ''] : [line.slice(0, index).trim().toLowerCase(), line.slice(index + 1).trim()]; }).filter(([key]) => key));
@@ -149,7 +160,7 @@ export async function analyzeGasAppRequirements(projectName, profile) {
 }
 
 export async function reviewMigratedNextApp(files) {
-  const configPath = new URL('../api.txt', import.meta.url);
+  const configPath = getAiConfigPath();
   let text;
   try { text = await fs.readFile(configPath, 'utf8'); } catch { return null; }
   const config = Object.fromEntries(text.split(/\r?\n/).map(line => line.trim()).filter(line => line && !line.startsWith('#')).map(line => { const index = line.indexOf('='); return index === -1 ? ['', ''] : [line.slice(0, index).trim().toLowerCase(), line.slice(index + 1).trim()]; }).filter(([key]) => key));
@@ -165,7 +176,7 @@ export async function reviewMigratedNextApp(files) {
 }
 
 export async function requestMigrationAutoRepair(issue, files) {
-  const configPath = new URL('../api.txt', import.meta.url);
+  const configPath = getAiConfigPath();
   let text;
   try { text = await fs.readFile(configPath, 'utf8'); } catch { return null; }
   const config = Object.fromEntries(text.split(/\r?\n/).map(line => line.trim()).filter(line => line && !line.startsWith('#')).map(line => { const index = line.indexOf('='); return index === -1 ? ['', ''] : [line.slice(0, index).trim().toLowerCase(), line.slice(index + 1).trim()]; }).filter(([key]) => key));
@@ -190,7 +201,7 @@ export async function requestMigrationAutoRepair(issue, files) {
 }
 
 export async function requestGasAutoRepair(issue, files) {
-  const configPath = new URL('../api.txt', import.meta.url);
+  const configPath = getAiConfigPath();
   let text;
   try { text = await fs.readFile(configPath, 'utf8'); } catch { return null; }
   const config = Object.fromEntries(text.split(/\r?\n/).map(line => line.trim()).filter(line => line && !line.startsWith('#')).map(line => { const index = line.indexOf('='); return index === -1 ? ['', ''] : [line.slice(0, index).trim().toLowerCase(), line.slice(index + 1).trim()]; }).filter(([key]) => key));
@@ -213,7 +224,7 @@ export async function requestGasAutoRepair(issue, files) {
 }
 
 export async function analyzeMobileApp(projectName, appUrl) {
-  const configPath = new URL('../api.txt', import.meta.url);
+  const configPath = getAiConfigPath();
   let text;
   try { text = await fs.readFile(configPath, 'utf8'); } catch { return null; }
   const config = Object.fromEntries(text.split(/\r?\n/).map(line => line.trim()).filter(line => line && !line.startsWith('#')).map(line => { const index = line.indexOf('='); return index === -1 ? ['', ''] : [line.slice(0, index).trim().toLowerCase(), line.slice(index + 1).trim()]; }).filter(([key]) => key));
@@ -228,7 +239,7 @@ export async function analyzeMobileApp(projectName, appUrl) {
 }
 
 export async function reviewMobileWrapper(files) {
-  const configPath = new URL('../api.txt', import.meta.url);
+  const configPath = getAiConfigPath();
   let text;
   try { text = await fs.readFile(configPath, 'utf8'); } catch { return null; }
   const config = Object.fromEntries(text.split(/\r?\n/).map(line => line.trim()).filter(line => line && !line.startsWith('#')).map(line => { const index = line.indexOf('='); return index === -1 ? ['', ''] : [line.slice(0, index).trim().toLowerCase(), line.slice(index + 1).trim()]; }).filter(([key]) => key));

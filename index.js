@@ -46,9 +46,12 @@ import { findGasBlueprint, saveGasBlueprint, applyGasBlueprint } from './templat
 // agar bot selalu konsisten membuat folder 'project' di sebelah dirinya
 // sendiri, terlepas dari mana terminal dijalankan.
 // ------------------------------------------------------------------
-const __filename = fileURLToPath(import.meta.url);
+const moduleUrl = import.meta.url;
+const __filename = moduleUrl ? fileURLToPath(moduleUrl) : (process.argv[1] || process.cwd());
 const __dirname = path.dirname(__filename);
-const ROOT_DIR = __dirname;
+// Binary agent memakai folder tempat pengguna menjalankan agent sebagai workspace.
+// Source CLI biasa tetap memakai folder repository seperti sebelumnya.
+const ROOT_DIR = process.env.WEBTONATIVE_WORKSPACE_ROOT || (process.pkg ? process.cwd() : __dirname);
 const PROJECT_CONTAINER_DIR = path.join(ROOT_DIR, 'project');
 const MIGRATION_CONTAINER_DIR = path.join(ROOT_DIR, 'webmigrasi');
 const MOBILE_CONTAINER_DIR = path.join(ROOT_DIR, 'apkmigrasi');
@@ -381,18 +384,27 @@ async function readGasProjectProfile(projectDir) {
   return profile;
 }
 
-async function runNextMigration() {
-  await fs.ensureDir(PROJECT_CONTAINER_DIR);
-  const entries = await fs.readdir(PROJECT_CONTAINER_DIR, { withFileTypes: true });
-  const choices = [];
-  for (const entry of entries) {
-    if (entry.isDirectory() && await fs.pathExists(path.join(PROJECT_CONTAINER_DIR, entry.name, 'Code.gs'))) {
-      choices.push({ name: entry.name, value: entry.name });
+async function runNextMigration(input = {}) {
+  let sourceName;
+  let sourceDir;
+  const requestedSourcePath = String(input.sourcePath || '').trim();
+  if (requestedSourcePath) {
+    sourceDir = path.resolve(requestedSourcePath);
+    sourceName = path.basename(sourceDir);
+    if (!await fs.pathExists(path.join(sourceDir, 'Code.gs'))) throw new Error('Direktori migrasi harus berisi file Code.gs dari proyek GAS hasil generator.');
+  } else {
+    await fs.ensureDir(PROJECT_CONTAINER_DIR);
+    const entries = await fs.readdir(PROJECT_CONTAINER_DIR, { withFileTypes: true });
+    const choices = [];
+    for (const entry of entries) {
+      if (entry.isDirectory() && await fs.pathExists(path.join(PROJECT_CONTAINER_DIR, entry.name, 'Code.gs'))) {
+        choices.push({ name: entry.name, value: entry.name });
+      }
     }
+    if (!choices.length) throw new Error('Tidak ada proyek GAS yang dapat dimigrasikan di folder project/.');
+    ({ sourceName } = await inquirer.prompt([{ type: 'list', name: 'sourceName', message: 'Pilih proyek GAS yang akan dimigrasikan:', choices }]));
+    sourceDir = path.join(PROJECT_CONTAINER_DIR, sourceName);
   }
-  if (!choices.length) throw new Error('Tidak ada proyek GAS yang dapat dimigrasikan di folder project/.');
-  const { sourceName } = await inquirer.prompt([{ type: 'list', name: 'sourceName', message: 'Pilih proyek GAS yang akan dimigrasikan:', choices }]);
-  const sourceDir = path.join(PROJECT_CONTAINER_DIR, sourceName);
   const profile = await readGasProjectProfile(sourceDir);
   logStep('AI Migration Preflight — menganalisis modul, UI, backend, SEO, dan risiko...');
   let migrationAnalysis = null;
@@ -435,7 +447,7 @@ async function runNextMigration() {
   }
   const targetDir = path.join(MIGRATION_CONTAINER_DIR, sourceName);
   if (await fs.pathExists(targetDir)) {
-    const { overwrite } = await inquirer.prompt([{ type: 'confirm', name: 'overwrite', message: `Folder webmigrasi/${sourceName} sudah ada. Timpa isinya?`, default: false }]);
+    const overwrite = input.overwrite === true ? true : (await inquirer.prompt([{ type: 'confirm', name: 'overwrite', message: `Folder webmigrasi/${sourceName} sudah ada. Timpa isinya?`, default: false }])).overwrite;
     if (!overwrite) throw new Error('Migrasi dibatalkan; folder tujuan tidak diubah.');
     await fs.emptyDir(targetDir);
   } else {
@@ -534,7 +546,8 @@ async function runNextMigration() {
     return;
   }
   logInfo('Jalankan npm run dev untuk menguji aplikasi hasil migrasi secara lokal.');
-  const { deploy } = await inquirer.prompt([{ type: 'confirm', name: 'deploy', message: 'Deploy ke Vercel sekarang dengan npx vercel --prod?', default: false }]);
+  const deploy = typeof input.deploy === 'boolean' ? input.deploy : (await inquirer.prompt([{ type: 'confirm', name: 'deploy', message: 'Deploy ke Vercel sekarang dengan npx vercel --prod?', default: false }])).deploy;
+  let deployedUrl = null;
   if (deploy) {
     logStep('Menjalankan deployment Vercel...');
     await ensureVercelSession(targetDir);
@@ -542,20 +555,21 @@ async function runNextMigration() {
     const deployArgs = ['vercel', '--prod', '--yes', '--name', vercelProjectName];
     logInfo(`Nama proyek Vercel: ${vercelProjectName}.`);
     try {
-      const deployedUrl = await deployToVercel(targetDir, deployArgs);
+      deployedUrl = await deployToVercel(targetDir, deployArgs);
       if (deployedUrl) logSuccess(`Link Vercel production: ${deployedUrl}`);
     } catch (error) {
       if (!/token is not valid|vercel login|authentication/i.test([error.message, error.stderr, error.stdout, error.all].filter(Boolean).join('\n'))) throw error;
       logInfo('Sesi Vercel tidak valid. Menjalankan vercel login untuk memperbarui autentikasi...');
       await runInteractive('npx', ['vercel', 'login'], targetDir);
       logStep('Mengulang deployment Vercel setelah login...');
-      const deployedUrl = await deployToVercel(targetDir, deployArgs);
+      deployedUrl = await deployToVercel(targetDir, deployArgs);
       if (deployedUrl) logSuccess(`Link Vercel production: ${deployedUrl}`);
     }
     logSuccess('Perintah deployment Vercel selesai.');
   } else if (!deploy) {
     logInfo('Deploy manual: cd webmigrasi/' + sourceName + ' && npm install && npx vercel --prod');
   }
+  return { sourcePath: sourceDir, localPath: targetDir, webAppUrl: deployedUrl || null, editorUrl: null };
 }
 
 async function getAndroidDevices(androidEnv = null) {
@@ -787,16 +801,27 @@ async function runAndroidEmulatorTest(targetDir) {
   }
 }
 
-async function runMobileWrapperBuild() {
+async function runMobileWrapperBuild(input = {}) {
   const engine = 'native'; /* Pilihan engine lama dipensiunkan: menu 3 selalu Android native.
     { name: 'Android native Kotlin/XML (Login, Dashboard, RecyclerView) — direkomendasikan', value: 'native' },
   */
   if (engine === 'native') {
-    const sources = await fs.pathExists(MIGRATION_CONTAINER_DIR) ? (await fs.readdir(MIGRATION_CONTAINER_DIR, { withFileTypes: true })).filter(entry => entry.isDirectory()).map(entry => ({ name: entry.name, value: entry.name })) : [];
-    if (!sources.length) throw new Error('Belum ada proyek di webmigrasi/. Jalankan menu Migrasi Project terlebih dahulu.');
-    const { sourceName } = await inquirer.prompt([{ type: 'list', name: 'sourceName', message: 'Pilih proyek untuk dibuat menjadi Android native:', choices: sources }]);
-    const { apiUrl } = await inquirer.prompt([{ type: 'input', name: 'apiUrl', message: 'URL API/website Next.js (opsional, untuk integrasi backend nanti):', default: '' }]);
-    const sourceDir = path.join(MIGRATION_CONTAINER_DIR, sourceName);
+    let sourceName;
+    let sourceDir;
+    let apiUrl;
+    const requestedSourcePath = String(input.sourcePath || '').trim();
+    if (requestedSourcePath) {
+      sourceDir = path.resolve(requestedSourcePath);
+      sourceName = path.basename(sourceDir);
+      if (!await fs.pathExists(sourceDir)) throw new Error('Direktori proyek sumber Android tidak ditemukan.');
+      apiUrl = String(input.apiUrl || '').trim();
+    } else {
+      const sources = await fs.pathExists(MIGRATION_CONTAINER_DIR) ? (await fs.readdir(MIGRATION_CONTAINER_DIR, { withFileTypes: true })).filter(entry => entry.isDirectory()).map(entry => ({ name: entry.name, value: entry.name })) : [];
+      if (!sources.length) throw new Error('Belum ada proyek di webmigrasi/. Jalankan menu Migrasi Project terlebih dahulu.');
+      ({ sourceName } = await inquirer.prompt([{ type: 'list', name: 'sourceName', message: 'Pilih proyek untuk dibuat menjadi Android native:', choices: sources }]));
+      ({ apiUrl } = await inquirer.prompt([{ type: 'input', name: 'apiUrl', message: 'URL API/website Next.js (opsional, untuk integrasi backend nanti):', default: '' }]));
+      sourceDir = path.join(MIGRATION_CONTAINER_DIR, sourceName);
+    }
     logStep('AI Native Mobile Preflight — menganalisis kesiapan login, dashboard, menu, dan data...');
     try {
       const analysis = await analyzeMobileApp(sourceName, 'https://native-mobile.local');
@@ -805,7 +830,7 @@ async function runMobileWrapperBuild() {
     } catch (err) { logError(`AI Native Mobile Preflight gagal: ${err.message}`); logInfo('Pembuatan proyek native tetap dilanjutkan.'); }
     const targetDir = path.join(MOBILE_CONTAINER_DIR, `${sourceName}-native`);
     if (await fs.pathExists(targetDir)) {
-      const { overwrite } = await inquirer.prompt([{ type: 'confirm', name: 'overwrite', message: `Folder apkmigrasi/${sourceName}-native sudah ada. Timpa isinya?`, default: false }]);
+      const overwrite = input.overwrite === true ? true : (await inquirer.prompt([{ type: 'confirm', name: 'overwrite', message: `Folder apkmigrasi/${sourceName}-native sudah ada. Timpa isinya?`, default: false }])).overwrite;
       if (!overwrite) return;
       await fs.emptyDir(targetDir);
     }
@@ -814,16 +839,17 @@ async function runMobileWrapperBuild() {
     logSuccess(`Proyek Android native siap: ${targetDir}`);
     const nativeWrapper = path.join(targetDir, process.platform === 'win32' ? 'gradlew.bat' : 'gradlew');
     const androidEnv = await ensureAndroidBuildEnv();
+    let outputApk = null;
     if (androidEnv && await fs.pathExists(nativeWrapper)) {
       try {
         logStep('Membuat APK debug Android native...');
         await runInteractive(nativeWrapper, ['assembleDebug', '--console=plain'], targetDir, androidEnv);
         const nativeApk = path.join(targetDir, 'app', 'build', 'outputs', 'apk', 'debug', 'app-debug.apk');
-        const outputApk = path.join(targetDir, `${sourceName}-debug.apk`);
+        outputApk = path.join(targetDir, `${sourceName}-debug.apk`);
         if (await fs.pathExists(nativeApk)) { await fs.copy(nativeApk, outputApk, { overwrite: true }); logSuccess(`APK siap: ${outputApk}`); const appId = `com.otomatis.${sourceName.toLowerCase().replace(/[^a-z0-9]+/g, '').replace(/^([^a-z])/, 'app$1').slice(0, 40) || 'aplikasi'}`; await installApkToConnectedDevice(outputApk, androidEnv, appId); }
       } catch (err) { logError(`Build APK otomatis gagal: ${err.message}`); logInfo('Periksa Java/Android SDK dan virtual memory Windows; Android Studio tidak diperlukan untuk build APK.'); }
     } else logInfo('JDK, Android SDK, atau Gradle Wrapper belum tersedia. Install Android SDK Command-line Tools dan Build Tools; Android Studio tidak diperlukan.');
-    return;
+    return { sourcePath: sourceDir, localPath: targetDir, apkPath: outputApk, webAppUrl: null, editorUrl: null };
   }
   const existingApps = await fs.pathExists(MOBILE_CONTAINER_DIR)
     ? (await fs.readdir(MOBILE_CONTAINER_DIR, { withFileTypes: true })).filter(entry => entry.isDirectory() && fs.existsSync(path.join(MOBILE_CONTAINER_DIR, entry.name, 'android', 'gradlew.bat'))).map(entry => entry.name)
@@ -1442,6 +1468,12 @@ async function printSuccessMessage(projectDir, displayName, deploymentId) {
   console.log(chalk.yellow('  clasp deployments'), chalk.gray('  → melihat semua deployment & ID-nya'));
   console.log(chalk.yellow('  clasp open --webapp'), chalk.gray('→ membuka langsung link Web App di browser'));
   console.log('');
+  return {
+    localPath: projectDir,
+    deploymentId: deploymentId || null,
+    webAppUrl: deploymentId ? `https://script.google.com/macros/s/${deploymentId}/exec` : null,
+    editorUrl: scriptId ? `https://script.google.com/d/${scriptId}/edit` : null
+  };
 }
 
 // ------------------------------------------------------------------
@@ -1566,17 +1598,24 @@ async function runWebGasJob(job) {
   await generateProjectFiles(projectDir, displayName, profile, visualTheme);
   await runGasPushWithAiRepair(projectDir);
   const deploymentId = await runClaspDeploy(projectDir, displayName);
-  await printSuccessMessage(projectDir, displayName, deploymentId);
+  return printSuccessMessage(projectDir, displayName, deploymentId);
 }
 
-async function runWebJob() {
-  const job = JSON.parse(process.env.WEBTONATIVE_JOB || '{}');
-  if (job.flow !== 'gas') throw new Error(`Executor otomatis untuk alur ${job.flow || 'tidak dikenal'} belum tersedia.`);
-  await runWebGasJob(job);
+async function runWebJob(inputJob) {
+  // Agent dashboard memanggil fungsi ini langsung. CLI lama masih dapat
+  // mengirim job melalui environment variable untuk kompatibilitas.
+  const job = inputJob || JSON.parse(process.env.WEBTONATIVE_JOB || '{}');
+  if (job.flow === 'gas') return runWebGasJob(job);
+  if (job.flow === 'migration') return runNextMigration({ sourcePath: job.options?.sourcePath, deploy: true, overwrite: false });
+  if (job.flow === 'android') return runMobileWrapperBuild({ sourcePath: job.options?.sourcePath, overwrite: false });
+  throw new Error(`Executor otomatis untuk alur ${job.flow || 'tidak dikenal'} belum tersedia.`);
 }
 
-if (process.env.WEBTONATIVE_JOB) {
+export { runWebJob, runWebGasJob };
+
+const executedDirectly = !process.env.WEBTONATIVE_AGENT_EMBEDDED && process.argv[1] && path.resolve(process.argv[1]) === path.resolve(__filename);
+if (executedDirectly && process.env.WEBTONATIVE_JOB) {
   runWebJob().catch(error => { logError(error.message || 'Job Web Tools gagal.'); process.exitCode = 1; });
-} else {
+} else if (executedDirectly) {
   main();
 }

@@ -20,7 +20,7 @@ export async function POST(request) {
 export async function PATCH(request) {
   try {
     const body = await request.json();
-    const job = await updateJob(tokenOf(request), body.id, body.status, body.note);
+    const job = await updateJob(tokenOf(request), body.id, body.status, body.note, body.result);
     return NextResponse.json({ job });
   } catch (error) {
     return NextResponse.json({ error: error.message || 'Status job gagal diperbarui.' }, { status: 400 });

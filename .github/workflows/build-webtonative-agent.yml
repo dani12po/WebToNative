@@ -1,0 +1,22 @@
+name: Build WebToNative Agent
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ['agent-v*']
+
+jobs:
+  windows-agent:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build:agent
+      - uses: actions/upload-artifact@v4
+        with:
+          name: WebToNative-Agent-win-x64
+          path: dist/agent/WebToNative-Agent-win-x64.exe

@@ -2,6 +2,7 @@
 
 import { createClient } from '@supabase/supabase-js';
 import { useEffect, useMemo, useState } from 'react';
+import { clearVaultSession } from './VaultGate';
 
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -74,7 +75,7 @@ function Landing({ open, theme, toggleTheme, children }) {
         <div className="landing-detail-grid security-cards">
           <article className="landing-detail-card"><h3>Pairing per perangkat</h3><p>CLI perlu dipasangkan sebelum dapat mengambil job dari workspace. Anda memilih komputer yang diberi akses.</p></article>
           <article className="landing-detail-card"><h3>Data sensitif terenkripsi</h3><p>Credential yang dipilih untuk disimpan diproses sebagai data terenkripsi dan tidak ditampilkan kembali sebagai nilai mentah di dashboard.</p></article>
-          <article className="landing-detail-card"><h3>Putuskan atau ekspor</h3><p>Hapus koneksi akun atau unduh backup yang tersedia dari pengaturan saat Anda ingin berpindah perangkat atau layanan.</p></article>
+          <article className="landing-detail-card"><h3>Akun tetap terkendali</h3><p>Username bersifat permanen. Anda dapat memperbarui email melalui konfirmasi Supabase, mengganti password, atau menghapus dan mengekspor koneksi saat berpindah perangkat.</p></article>
         </div>
         <p className="detail-note">Kami menjelaskan alur penggunaan yang penting tanpa mempublikasikan detail keamanan internal atau isi credential Anda.</p>
       </section>
@@ -96,7 +97,10 @@ export default function AuthGate({ children }) {
   useEffect(() => {
     if (!supabase) return setSession(null);
     supabase.auth.getSession().then(({ data }) => setSession(data.session));
-    const { data: subscription } = supabase.auth.onAuthStateChange((_event, next) => setSession(next));
+    const { data: subscription } = supabase.auth.onAuthStateChange((event, next) => {
+      if (event === 'SIGNED_OUT') clearVaultSession();
+      setSession(next);
+    });
     return () => subscription.subscription.unsubscribe();
   }, [supabase]);
 
